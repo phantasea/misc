@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"regexp"
@@ -22,9 +23,11 @@ import (
 // import "github.com/pkg/profile"
 
 var placeholder *regexp.Regexp
+var activeTempFiles []string
 
 func init() {
-	placeholder = regexp.MustCompile("\\\\?(?:{[+s]*[0-9,-.]*}|{q}|{\\+?n})")
+	placeholder = regexp.MustCompile("\\\\?(?:{[+sf]*[0-9,-.]*}|{q}|{\\+?f?nf?})")
+	activeTempFiles = []string{}
 }
 
 type jumpMode int
@@ -73,7 +76,7 @@ type Terminal struct {
 	xoffset    int
 	yanked     []rune
 	input      []rune
-	multi      bool
+	multi      int
 	sort       bool
 	toggleSort bool
 	delimiter  Delimiter
@@ -103,6 +106,7 @@ type Terminal struct {
 	jumping    jumpMode
 	jumpLabels string
 	printer    func(string)
+	printsep   string
 	merger     *Merger
 	selected   map[int32]selectedItem
 	version    int64
@@ -231,6 +235,7 @@ type placeholderFlags struct {
 	preserveSpace bool
 	number        bool
 	query         bool
+	file          bool
 }
 
 func toActions(types ...actionType) []action {
@@ -407,6 +412,7 @@ func NewTerminal(opts *Options, eventBox *util.EventBox) *Terminal {
 		jumping:    jumpDisabled,
 		jumpLabels: opts.JumpLabels,
 		printer:    opts.Printer,
+		printsep:   opts.PrintSep,
 		merger:     EmptyMerger,
 		selected:   make(map[int32]selectedItem),
 		reqBox:     util.NewEventBox(),
@@ -744,8 +750,12 @@ func (t *Terminal) printInfo() {
 			output += " -S"
 		}
 	}
-	if t.multi && len(t.selected) > 0 {
-		output += fmt.Sprintf(" (%d)", len(t.selected))
+	if len(t.selected) > 0 {
+		if t.multi == maxMulti {
+			output += fmt.Sprintf(" (%d)", len(t.selected))
+		} else {
+			output += fmt.Sprintf(" (%d/%d)", len(t.selected), t.multi)
+		}
 	}
 	if t.progress > 0 && t.progress < 100 {
 		output += fmt.Sprintf(" (%d%%)", t.progress)
@@ -1207,6 +1217,9 @@ func parsePlaceholder(match string) (bool, string, placeholderFlags) {
 		case 'n':
 			flags.number = true
 			skipChars++
+		case 'f':
+			flags.file = true
+			skipChars++
 		case 'q':
 			flags.query = true
 		default:
@@ -1232,7 +1245,27 @@ func hasPreviewFlags(template string) (plus bool, query bool) {
 	return
 }
 
-func replacePlaceholder(template string, stripAnsi bool, delimiter Delimiter, forcePlus bool, query string, allItems []*Item) string {
+func writeTemporaryFile(data []string, printSep string) string {
+	f, err := ioutil.TempFile("", "fzf-preview-*")
+	if err != nil {
+		errorExit("Unable to create temporary file")
+	}
+	defer f.Close()
+
+	f.WriteString(strings.Join(data, printSep))
+	f.WriteString(printSep)
+	activeTempFiles = append(activeTempFiles, f.Name())
+	return f.Name()
+}
+
+func cleanTemporaryFiles() {
+	for _, filename := range activeTempFiles {
+		os.Remove(filename)
+	}
+	activeTempFiles = []string{}
+}
+
+func replacePlaceholder(template string, stripAnsi bool, delimiter Delimiter, printsep string, forcePlus bool, query string, allItems []*Item) string {
 	current := allItems[:1]
 	selected := allItems[1:]
 	if current[0] == nil {
@@ -1269,9 +1302,14 @@ func replacePlaceholder(template string, stripAnsi bool, delimiter Delimiter, fo
 					} else {
 						replacements[idx] = strconv.Itoa(n)
 					}
+				} else if flags.file {
+					replacements[idx] = item.AsString(stripAnsi)
 				} else {
 					replacements[idx] = quoteEntry(item.AsString(stripAnsi))
 				}
+			}
+			if flags.file {
+				return writeTemporaryFile(replacements, printsep)
 			}
 			return strings.Join(replacements, " ")
 		}
@@ -1302,7 +1340,13 @@ func replacePlaceholder(template string, stripAnsi bool, delimiter Delimiter, fo
 			if !flags.preserveSpace {
 				str = strings.TrimSpace(str)
 			}
-			replacements[idx] = quoteEntry(str)
+			if !flags.file {
+				str = quoteEntry(str)
+			}
+			replacements[idx] = str
+		}
+		if flags.file {
+			return writeTemporaryFile(replacements, printsep)
 		}
 		return strings.Join(replacements, " ")
 	})
@@ -1319,7 +1363,7 @@ func (t *Terminal) executeCommand(template string, forcePlus bool, background bo
 	if !valid {
 		return
 	}
-	command := replacePlaceholder(template, t.ansi, t.delimiter, forcePlus, string(t.input), list)
+	command := replacePlaceholder(template, t.ansi, t.delimiter, t.printsep, forcePlus, string(t.input), list)
 	cmd := util.ExecCommand(command, false)
 	if !background {
 		cmd.Stdin = os.Stdin
@@ -1335,6 +1379,7 @@ func (t *Terminal) executeCommand(template string, forcePlus bool, background bo
 		cmd.Run()
 		t.tui.Resume(false)
 	}
+	cleanTemporaryFiles()
 }
 
 func (t *Terminal) hasPreviewer() bool {
@@ -1385,9 +1430,18 @@ func (t *Terminal) buildPlusList(template string, forcePlus bool) (bool, []*Item
 	return true, sels
 }
 
-func (t *Terminal) selectItem(item *Item) {
+func (t *Terminal) selectItem(item *Item) bool {
+	if len(t.selected) >= t.multi {
+		return false
+	}
+	if _, found := t.selected[item.Index()]; found {
+		return false
+	}
+
 	t.selected[item.Index()] = selectedItem{time.Now(), item}
 	t.version++
+
+	return true
 }
 
 func (t *Terminal) deselectItem(item *Item) {
@@ -1395,12 +1449,12 @@ func (t *Terminal) deselectItem(item *Item) {
 	t.version++
 }
 
-func (t *Terminal) toggleItem(item *Item) {
+func (t *Terminal) toggleItem(item *Item) bool {
 	if _, found := t.selected[item.Index()]; !found {
-		t.selectItem(item)
-	} else {
-		t.deselectItem(item)
+		return t.selectItem(item)
 	}
+	t.deselectItem(item)
+	return true
 }
 
 func (t *Terminal) killPreview(code int) {
@@ -1492,7 +1546,7 @@ func (t *Terminal) Loop() {
 				// We don't display preview window if no match
 				if request[0] != nil {
 					command := replacePlaceholder(t.preview.command,
-						t.ansi, t.delimiter, false, string(t.input), request)
+						t.ansi, t.delimiter, t.printsep, false, string(t.input), request)
 					cmd := util.ExecCommand(command, true)
 					if t.pwindow != nil {
 						env := os.Environ()
@@ -1534,6 +1588,7 @@ func (t *Terminal) Loop() {
 					if out.Len() > 0 || !<-updateChan {
 						t.reqBox.Set(reqPreviewDisplay, out.String())
 					}
+					cleanTemporaryFiles()
 				} else {
 					t.reqBox.Set(reqPreviewDisplay, "")
 				}
@@ -1645,11 +1700,12 @@ func (t *Terminal) Loop() {
 				}
 			}
 		}
-		toggle := func() {
-			if t.cy < t.merger.Length() {
-				t.toggleItem(t.merger.Get(t.cy).item)
+		toggle := func() bool {
+			if t.cy < t.merger.Length() && t.toggleItem(t.merger.Get(t.cy).item) {
 				req(reqInfo)
+				return true
 			}
+			return false
 		}
 		scrollPreview := func(amount int) {
 			if !t.previewer.more {
@@ -1771,27 +1827,42 @@ func (t *Terminal) Loop() {
 					t.cx--
 				}
 			case actSelectAll:
-				if t.multi {
+				if t.multi > 0 {
 					for i := 0; i < t.merger.Length(); i++ {
-						t.selectItem(t.merger.Get(i).item)
+						if !t.selectItem(t.merger.Get(i).item) {
+							break
+						}
 					}
 					req(reqList, reqInfo)
 				}
 			case actDeselectAll:
-				if t.multi {
+				if t.multi > 0 {
 					t.selected = make(map[int32]selectedItem)
 					t.version++
 					req(reqList, reqInfo)
 				}
 			case actToggle:
-				if t.multi && t.merger.Length() > 0 {
-					toggle()
+				if t.multi > 0 && t.merger.Length() > 0 && toggle() {
 					req(reqList)
 				}
 			case actToggleAll:
-				if t.multi {
+				if t.multi > 0 {
+					prevIndexes := make(map[int]struct{})
+					for i := 0; i < t.merger.Length() && len(t.selected) > 0; i++ {
+						item := t.merger.Get(i).item
+						if _, found := t.selected[item.Index()]; found {
+							prevIndexes[i] = struct{}{}
+							t.deselectItem(item)
+						}
+					}
+
 					for i := 0; i < t.merger.Length(); i++ {
-						t.toggleItem(t.merger.Get(i).item)
+						if _, found := prevIndexes[i]; !found {
+							item := t.merger.Get(i).item
+							if !t.selectItem(item) {
+								break
+							}
+						}
 					}
 					req(reqList, reqInfo)
 				}
@@ -1806,14 +1877,12 @@ func (t *Terminal) Loop() {
 				}
 				return doAction(action{t: actToggleUp}, mapkey)
 			case actToggleDown:
-				if t.multi && t.merger.Length() > 0 {
-					toggle()
+				if t.multi > 0 && t.merger.Length() > 0 && toggle() {
 					t.vmove(-1, true)
 					req(reqList)
 				}
 			case actToggleUp:
-				if t.multi && t.merger.Length() > 0 {
-					toggle()
+				if t.multi > 0 && t.merger.Length() > 0 && toggle() {
 					t.vmove(1, true)
 					req(reqList)
 				}
@@ -1917,7 +1986,7 @@ func (t *Terminal) Loop() {
 				if me.S != 0 {
 					// Scroll
 					if t.window.Enclose(my, mx) && t.merger.Length() > 0 {
-						if t.multi && me.Mod {
+						if t.multi > 0 && me.Mod {
 							toggle()
 						}
 						t.vmove(me.S, true)
@@ -1957,7 +2026,7 @@ func (t *Terminal) Loop() {
 							t.cx = mx + t.xoffset
 						} else if my >= min {
 							// List
-							if t.vset(t.offset+my-min) && t.multi && me.Mod {
+							if t.vset(t.offset+my-min) && t.multi > 0 && me.Mod {
 								toggle()
 							}
 							req(reqList)

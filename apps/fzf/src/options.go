@@ -38,7 +38,7 @@ const usage = `usage: fzf [options]
                           (default: length)
 
   Interface
-    -m, --multi           Enable multi-select with tab/shift-tab
+    -m, --multi[=MAX]     Enable multi-select with tab/shift-tab
     --no-mouse            Disable mouse
     --bind=KEYBINDS       Custom key bindings. Refer to the man page.
     --cycle               Enable cyclic scroll
@@ -162,7 +162,7 @@ type Options struct {
 	Sort        int
 	Tac         bool
 	Criteria    []criterion
-	Multi       bool
+	Multi       int
 	Ansi        bool
 	Mouse       bool
 	Theme       *tui.ColorTheme
@@ -189,6 +189,7 @@ type Options struct {
 	PrintQuery  bool
 	ReadZero    bool
 	Printer     func(string)
+	PrintSep    string
 	Sync        bool
 	History     *History
 	Header      []string
@@ -214,7 +215,7 @@ func defaultOptions() *Options {
 		Sort:        1000,
 		Tac:         false,
 		Criteria:    []criterion{byScore, byLength},
-		Multi:       false,
+		Multi:       0,
 		Ansi:        false,
 		Mouse:       true,
 		Theme:       tui.EmptyTheme(),
@@ -240,6 +241,7 @@ func defaultOptions() *Options {
 		PrintQuery:  false,
 		ReadZero:    false,
 		Printer:     func(str string) { fmt.Println(str) },
+		PrintSep:    "\n",
 		Sync:        false,
 		History:     nil,
 		Header:      make([]string, 0),
@@ -312,13 +314,14 @@ func nextInt(args []string, i *int, message string) int {
 	return atoi(args[*i])
 }
 
-func optionalNumeric(args []string, i *int) int {
+func optionalNumeric(args []string, i *int, defaultValue int) int {
 	if len(args) > *i+1 {
 		if strings.IndexAny(args[*i+1], "0123456789") == 0 {
 			*i++
+			return atoi(args[*i])
 		}
 	}
-	return 1 // Don't care
+	return defaultValue
 }
 
 func splitNth(str string) []Range {
@@ -1031,7 +1034,7 @@ func parseOptions(opts *Options, allArgs []string) {
 		case "--with-nth":
 			opts.WithNth = splitNth(nextString(allArgs, &i, "nth expression required"))
 		case "-s", "--sort":
-			opts.Sort = optionalNumeric(allArgs, &i)
+			opts.Sort = optionalNumeric(allArgs, &i, 1)
 		case "+s", "--no-sort":
 			opts.Sort = 0
 		case "--tac":
@@ -1043,9 +1046,9 @@ func parseOptions(opts *Options, allArgs []string) {
 		case "+i":
 			opts.Case = CaseRespect
 		case "-m", "--multi":
-			opts.Multi = true
+			opts.Multi = optionalNumeric(allArgs, &i, maxMulti)
 		case "+m", "--no-multi":
-			opts.Multi = false
+			opts.Multi = 0
 		case "--ansi":
 			opts.Ansi = true
 		case "--no-ansi":
@@ -1106,8 +1109,10 @@ func parseOptions(opts *Options, allArgs []string) {
 			opts.ReadZero = false
 		case "--print0":
 			opts.Printer = func(str string) { fmt.Print(str, "\x00") }
+			opts.PrintSep = "\x00"
 		case "--no-print0":
 			opts.Printer = func(str string) { fmt.Println(str) }
+			opts.PrintSep = "\n"
 		case "--print-query":
 			opts.PrintQuery = true
 		case "--no-print-query":
@@ -1186,6 +1191,8 @@ func parseOptions(opts *Options, allArgs []string) {
 				opts.WithNth = splitNth(value)
 			} else if match, _ := optString(arg, "-s", "--sort="); match {
 				opts.Sort = 1 // Don't care
+			} else if match, value := optString(arg, "-s", "--multi="); match {
+				opts.Multi = atoi(value)
 			} else if match, value := optString(arg, "--height="); match {
 				opts.Height = parseHeight(value)
 			} else if match, value := optString(arg, "--min-height="); match {

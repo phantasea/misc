@@ -256,12 +256,12 @@ class TestGoFZF < TestBase
 
     # Testing basic key bindings
     tmux.send_keys '99', 'C-a', '1', 'C-f', '3', 'C-b', 'C-h', 'C-u', 'C-e', 'C-y', 'C-k', 'Tab', 'BTab'
-    tmux.until { |lines| lines[-2] == '  856/100000' }
-    lines = tmux.capture
-    assert_equal '> 3910',       lines[-4]
-    assert_equal '  391',        lines[-3]
-    assert_equal '  856/100000', lines[-2]
-    assert_equal '> 391',        lines[-1]
+    tmux.until do |lines|
+      '> 3910'       == lines[-4] &&
+      '  391'        == lines[-3] &&
+      '  856/100000' == lines[-2] &&
+      '> 391'        == lines[-1]
+    end
 
     tmux.send_keys :Enter
     assert_equal '3910', readonce.chomp
@@ -369,6 +369,65 @@ class TestGoFZF < TestBase
     tmux.until { |lines| lines[-2].include? '(6)' }
     tmux.send_keys 'C-M'
     assert_equal %w[3 2 5 6 8 7], readonce.split($INPUT_RECORD_SEPARATOR)
+  end
+
+  def test_multi_max
+    tmux.send_keys "seq 1 10 | #{FZF} -m 3 --bind A:select-all,T:toggle-all --preview 'echo [{+}]/{}'", :Enter
+
+    tmux.until { |lines| lines.item_count == 10 }
+
+    tmux.send_keys '1'
+    tmux.until do |lines|
+      lines[1].include?('[1]/1') && lines[-2].include?('2/10')
+    end
+
+    tmux.send_keys 'A'
+    tmux.until do |lines|
+      lines[1].include?('[1 10]/1') && lines[-2].include?('2/10 (2/3)')
+    end
+
+    tmux.send_keys :BSpace
+    tmux.until { |lines| lines[-2].include?('10/10 (2/3)') }
+
+    tmux.send_keys 'T'
+    tmux.until do |lines|
+      lines[1].include?('[2 3 4]/1') && lines[-2].include?('10/10 (3/3)')
+    end
+
+    %w[T A].each do |key|
+      tmux.send_keys key
+      tmux.until do |lines|
+        lines[1].include?('[1 5 6]/1') && lines[-2].include?('10/10 (3/3)')
+      end
+    end
+
+    tmux.send_keys :BTab
+    tmux.until do |lines|
+      lines[1].include?('[5 6]/2') && lines[-2].include?('10/10 (2/3)')
+    end
+
+    [:BTab, :BTab, 'A'].each do |key|
+      tmux.send_keys key
+      tmux.until do |lines|
+        lines[1].include?('[5 6 2]/3') && lines[-2].include?('10/10 (3/3)')
+      end
+    end
+
+    tmux.send_keys '2'
+    tmux.until { |lines| lines[-2].include?('1/10 (3/3)') }
+
+    tmux.send_keys 'T'
+    tmux.until do |lines|
+      lines[1].include?('[5 6]/2') && lines[-2].include?('1/10 (2/3)')
+    end
+
+    tmux.send_keys :BSpace
+    tmux.until { |lines| lines[-2].include?('10/10 (2/3)') }
+
+    tmux.send_keys 'A'
+    tmux.until do |lines|
+      lines[1].include?('[5 6 1]/1') && lines[-2].include?('10/10 (3/3)')
+    end
   end
 
   def test_with_nth
@@ -873,7 +932,7 @@ class TestGoFZF < TestBase
 
   def test_execute
     output = '/tmp/fzf-test-execute'
-    opts = %[--bind \\"alt-a:execute(echo [{}] >> #{output}),alt-b:execute[echo /{}{}/ >> #{output}],C:execute:echo /{}{}{}/ >> #{output}\\"]
+    opts = %[--bind \\"alt-a:execute(echo /{}/ >> #{output}),alt-b:execute[echo /{}{}/ >> #{output}],C:execute:echo /{}{}{}/ >> #{output}\\"]
     wait = ->(exp) { tmux.until { |lines| lines[-2].include? exp } }
     writelines tempname, %w[foo'bar foo"bar foo$bar]
     tmux.send_keys "cat #{tempname} | #{fzf opts}; sync", :Enter
@@ -898,7 +957,7 @@ class TestGoFZF < TestBase
     wait['/3']
     tmux.send_keys :Enter
     readonce
-    assert_equal %w[[foo'bar] [foo'bar]
+    assert_equal %w[/foo'bar/ /foo'bar/
                     /foo"barfoo"bar/ /foo"barfoo"bar/
                     /foo$barfoo$barfoo$bar/],
                  File.readlines(output).map(&:chomp)
@@ -1415,6 +1474,15 @@ class TestGoFZF < TestBase
     tmux.until { |lines| lines[1].include?('{//1 10/1   10  /12//0 9}') }
     tmux.send_keys '3'
     tmux.until { |lines| lines[1].include?('{//1 10/1   10  /123//0 9}') }
+  end
+
+  def test_preview_file
+    tmux.send_keys %[(echo foo bar; echo bar foo) | #{FZF} --multi --preview 'cat {+f} {+f2} {+nf} {+fn}' --print0], :Enter
+    tmux.until { |lines| lines[1].include?('foo barbar00') }
+    tmux.send_keys :BTab
+    tmux.until { |lines| lines[1].include?('foo barbar00') }
+    tmux.send_keys :BTab
+    tmux.until { |lines| lines[1].include?('foo barbar foobarfoo0101') }
   end
 
   def test_preview_q_no_match
