@@ -386,7 +386,7 @@ func parseKeyChords(str string, message string) map[int]string {
 	}
 
 	tokens := strings.Split(str, ",")
-	if str == "," || strings.HasPrefix(str, ",,") || strings.HasSuffix(str, ",,") || strings.Index(str, ",,,") >= 0 {
+	if str == "," || strings.HasPrefix(str, ",,") || strings.HasSuffix(str, ",,") || strings.Contains(str, ",,,") {
 		tokens = append(tokens, ",")
 	}
 
@@ -628,7 +628,7 @@ func init() {
 	// Backreferences are not supported.
 	// "~!@#$%^&*;/|".each_char.map { |c| Regexp.escape(c) }.map { |c| "#{c}[^#{c}]*#{c}" }.join('|')
 	executeRegexp = regexp.MustCompile(
-		"(?si):(execute(?:-multi|-silent)?):.+|:(execute(?:-multi|-silent)?)(\\([^)]*\\)|\\[[^\\]]*\\]|~[^~]*~|![^!]*!|@[^@]*@|\\#[^\\#]*\\#|\\$[^\\$]*\\$|%[^%]*%|\\^[^\\^]*\\^|&[^&]*&|\\*[^\\*]*\\*|;[^;]*;|/[^/]*/|\\|[^\\|]*\\|)")
+		`(?si):(execute(?:-multi|-silent)?):.+|:(execute(?:-multi|-silent)?)(\([^)]*\)|\[[^\]]*\]|~[^~]*~|![^!]*!|@[^@]*@|\#[^\#]*\#|\$[^\$]*\$|%[^%]*%|\^[^\^]*\^|&[^&]*&|\*[^\*]*\*|;[^;]*;|/[^/]*/|\|[^\|]*\|)`)
 }
 
 func parseKeymap(keymap map[int][]action, str string) {
@@ -1191,7 +1191,7 @@ func parseOptions(opts *Options, allArgs []string) {
 				opts.WithNth = splitNth(value)
 			} else if match, _ := optString(arg, "-s", "--sort="); match {
 				opts.Sort = 1 // Don't care
-			} else if match, value := optString(arg, "-s", "--multi="); match {
+			} else if match, value := optString(arg, "-m", "--multi="); match {
 				opts.Multi = atoi(value)
 			} else if match, value := optString(arg, "--height="); match {
 				opts.Height = parseHeight(value)

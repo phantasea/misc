@@ -26,7 +26,7 @@ var placeholder *regexp.Regexp
 var activeTempFiles []string
 
 func init() {
-	placeholder = regexp.MustCompile("\\\\?(?:{[+sf]*[0-9,-.]*}|{q}|{\\+?f?nf?})")
+	placeholder = regexp.MustCompile(`\\?(?:{[+sf]*[0-9,-.]*}|{q}|{\+?f?nf?})`)
 	activeTempFiles = []string{}
 }
 
@@ -1012,19 +1012,6 @@ func (t *Terminal) printHighlighted(result Result, attr tui.Attr, col1 tui.Color
 	return displayWidth
 }
 
-func numLinesMax(str string, max int) int {
-	lines := 0
-	for lines < max {
-		idx := strings.Index(str, "\n")
-		if idx < 0 {
-			break
-		}
-		str = str[idx+1:]
-		lines++
-	}
-	return lines
-}
-
 func (t *Terminal) printPreview() {
 	if !t.hasPreviewWindow() {
 		return
@@ -1837,8 +1824,9 @@ func (t *Terminal) Loop() {
 				}
 			case actDeselectAll:
 				if t.multi > 0 {
-					t.selected = make(map[int32]selectedItem)
-					t.version++
+					for i := 0; i < t.merger.Length() && len(t.selected) > 0; i++ {
+						t.deselectItem(t.merger.Get(i).item)
+					}
 					req(reqList, reqInfo)
 				}
 			case actToggle:
