@@ -878,7 +878,7 @@ key() {
 
         # Mark files for operation.
         ${FFFM_KEY_YANK:=y}|\
-        ${FFFM_KEY_MOVE:=m}|\
+        ${FFFM_KEY_MOVE:=x}|\
         ${FFFM_KEY_TRASH:=d}|\
         ${FFFM_KEY_LINK:=s}|\
         ${FFFM_KEY_BULK_RENAME:=b})
@@ -887,7 +887,7 @@ key() {
 
         # Mark all files for operation.
         ${FFFM_KEY_YANK_ALL:=Y}|\
-        ${FFFM_KEY_MOVE_ALL:=M}|\
+        ${FFFM_KEY_MOVE_ALL:=X}|\
         ${FFFM_KEY_TRASH_ALL:=D}|\
         ${FFFM_KEY_LINK_ALL:=S}|\
         ${FFFM_KEY_BULK_RENAME_ALL:=B})
@@ -946,7 +946,7 @@ key() {
         ;;
 
         # Create a directory.
-        ${FFFM_KEY_MKDIR:=n})
+        ${FFFM_KEY_MKDIR:=I})
             cmd_line "mkdir: " "dirs"
 
             [[ $cmd_reply ]] &&
@@ -963,7 +963,7 @@ key() {
         ;;
 
         # Create a file.
-        ${FFFM_KEY_MKFILE:=f})
+        ${FFFM_KEY_MKFILE:=i})
             cmd_line "mkfile: "
 
             [[ $cmd_reply ]] &&
@@ -980,7 +980,7 @@ key() {
         ;;
 
         # Show file attributes.
-        ${FFFM_KEY_ATTRIBUTES:=x})
+        ${FFFM_KEY_ATTRIBUTES:=w})
             [[ -e "${list[scroll]}" ]] && {
                 clear_screen
                 status_line "${list[scroll]}"
@@ -991,7 +991,7 @@ key() {
         ;;
 
         # Toggle executable flag.
-        ${FFFM_KEY_EXECUTABLE:=X})
+        ${FFFM_KEY_EXECUTABLE:=u})
             [[ -f ${list[scroll]} && -w ${list[scroll]} ]] && {
                 if [[ -x ${list[scroll]} ]]; then
                     chmod -x "${list[scroll]}"
@@ -1004,7 +1004,7 @@ key() {
         ;;
 
         # Show image in terminal.
-        ${FFFM_KEY_IMAGE:=i})
+        ${FFFM_KEY_IMAGE:=v})
             draw_img
         ;;
 
@@ -1037,7 +1037,7 @@ key() {
         ;;
 
         # Refresh current dir.
-        ${FFFM_KEY_REFRESH:=e})
+        ${FFFM_KEY_REFRESH:=R})
             open "$PWD"
         ;;
 

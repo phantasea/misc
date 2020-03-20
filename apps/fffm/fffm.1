@@ -30,30 +30,30 @@ G: go to bottom
 /: search
 t: go to trash
 ~: go to home
-e: refresh current dir
+R: refresh current dir
 !: open shell in current dir
 
-x: view file/dir attributes
-i: display image with w3m-img
+w: view file/dir attributes
+v: display image with w3m-img
 
 down:  scroll down
 up:    scroll up
 left:  go to parent dir
 right: go to child dir
 
-f: new file
-n: new dir
+i: new file
+I: new dir
 r: rename
-X: toggle executable
+u: toggle executable
 
 y: mark copy
-m: mark move
+x: mark move
 d: mark trash (~/.local/share/fffm/trash/)
 s: mark symbolic link
 b: mark bulk rename
 
 Y: mark all for copy
-M: mark all for move
+X: mark all for move
 D: mark all for trash (~/.local/share/fffm/trash/)
 S: mark all for symbolic link
 B: mark all for bulk rename
@@ -200,13 +200,13 @@ export FFFM_KEY_GO_TRASH="t"
 ### File operations.
 
 export FFFM_KEY_YANK="y"
-export FFFM_KEY_MOVE="m"
+export FFFM_KEY_MOVE="x"
 export FFFM_KEY_TRASH="d"
 export FFFM_KEY_LINK="s"
 export FFFM_KEY_BULK_RENAME="b"
 
 export FFFM_KEY_YANK_ALL="Y"
-export FFFM_KEY_MOVE_ALL="M"
+export FFFM_KEY_MOVE_ALL="X"
 export FFFM_KEY_TRASH_ALL="D"
 export FFFM_KEY_LINK_ALL="S"
 export FFFM_KEY_BULK_RENAME_ALL="B"
@@ -215,16 +215,16 @@ export FFFM_KEY_PASTE="p"
 export FFFM_KEY_CLEAR="c"
 
 export FFFM_KEY_RENAME="r"
-export FFFM_KEY_MKDIR="n"
-export FFFM_KEY_MKFILE="f"
+export FFFM_KEY_MKDIR="I"
+export FFFM_KEY_MKFILE="i"
 
 ### Miscellaneous
 
 # Show file attributes.
-export FFFM_KEY_ATTRIBUTES="x"
+export FFFM_KEY_ATTRIBUTES="w"
 
 # Toggle executable flag.
-export FFFM_KEY_EXECUTABLE="X"
+export FFFM_KEY_EXECUTABLE="u"
 
 # Toggle hidden files.
 export FFFM_KEY_HIDDEN="."
