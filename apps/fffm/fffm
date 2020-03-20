@@ -94,7 +94,7 @@ get_term_size() {
     read -r LINES COLUMNS < <(stty size)
 
     # Max list items that fit in the scroll area.
-    ((max_items=LINES-3))
+    ((max_items=LINES-2))
 }
 
 get_ls_colors() {
@@ -151,6 +151,8 @@ get_mime_type() {
 }
 
 status_line() {
+    [[ $file_picker -eq 1 ]] && return
+
     # Status_line to print when files are marked for operation.
     local mark_ui="[${#marked_files[@]}] selected (${file_program[*]}) [p] ->"
 
