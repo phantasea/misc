@@ -1,0 +1,33 @@
+#compdef imgp
+#
+# Completion definition for imgp.
+#
+# Author:
+#   Arun Prakash Jana <engineerarun@gmail.com>
+#
+
+setopt localoptions noshwordsplit noksharrays
+local -a args
+args=(
+    '(-a --adapt)'{-a,--adapt}'[adapt to resolution by orientation]'
+    '(-c --convert)'{-c,--convert}'[convert PNG to JPG format]'
+    '(-d --dot)'{-d,--dot}'[include hidden files (on Linux)]'
+    '(-e --eraseexif)'{-e,--eraseexif}'[erase exif metadata]'
+    '(-f --force)'{-f,--force}'[force to exact specified resolution]'
+    '(-h --help)'{-h,--help}'[show help]'
+    '(-i --includeimgp)'{-i,--includeimgp}'[re-process _IMGP files]'
+    '(-k --keep)'{-k,--keep}'[skip images with matching hres or vres]'
+    '(-m --mute)'{-m,--mute}'[operate silently]'
+    '(-n --enlarge)'{-n,--enlarge}'[enlarge smaller images]'
+    '(--nn)--n[use nearest neighbour interpolation for PNG]'
+    '(-o --rotate)'{-o,--rotate}'[rotate clockwise by angle]:degree'
+    '(-p --optimize)'{-p,--optimize}'[optimize the output images]'
+    '(--pr --progressive)'{--pr,--progressive}'[save JPEG as progressive]'
+    '(-q --quiet)'{-q,--quality}'[specify quality factor (1-95)]:factor'
+    '(-r --recurse)'{-r,--recurse}'[process directories recursively]'
+    '(-s --size)'{-s,--size}'[min byte size to process an image]:bytes'
+    '(-w --overwrite)'{-w,--overwrite}'[overwrite source images]'
+    '(-x --res)'{-x,--res}'[output resolution]:HxV or %'
+    '(-z --debug)'{-z,--debug}'[enable debug logs]'
+)
+_arguments -S -s $args
