@@ -39,6 +39,7 @@ declare $ARRAY fzf_options=(
     # case-insensitive match
     -i
     --inline-info
+    --height=0
 )
 
 [ $IS_FILE "$FILE_CONFIG" ] &&
