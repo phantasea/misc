@@ -48,7 +48,8 @@ function Mpc::get_options {
 
 
 function Mpc::get_playlist {
-    mpc playlist --format "%position%. ${song_list_format:-$DEFAULT_SONG_LIST_FORMAT}"
+    #mpc playlist --format "%position%. ${song_list_format:-$DEFAULT_SONG_LIST_FORMAT}"
+    mpc playlist --format "%position%. %file%"
 }
 
 
