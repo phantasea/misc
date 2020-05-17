@@ -66,8 +66,7 @@ clear_screen() {
     # '\e[1;%sr':  Clearing the screen resets the scroll region(?). Re-set it.
     #              Also sets cursor to (0,0).
     printf '\e[%sH\e[9999C\e[1J%b\e[1;%sr' \
-           "$((LINES))" "${TMUX:+\e[2J}" "$max_items"
-           #"$((LINES-2))" "${TMUX:+\e[2J}" "$max_items"  # mod by sim1
+           "$((LINES-1))" "${TMUX:+\e[2J}" "$max_items"  # mod by sim1
 }
 
 setup_options() {
@@ -99,8 +98,7 @@ get_term_size() {
 
     # Max list items that fit in the scroll area.
     # mod by sim1
-    #((max_items=LINES-2))
-    ((max_items=LINES))
+    ((max_items=LINES-1))
 }
 
 get_ls_colors() {
@@ -157,9 +155,6 @@ get_mime_type() {
 }
 
 status_line() {
-    # add by sim1: do nothing
-    return
-
     [[ $file_picker -eq 1 ]] && return
 
     # Status_line to print when files are marked for operation.
@@ -181,15 +176,15 @@ status_line() {
     # '\e[H\e[K':  Clear line below status_line.
     # '\e8':       Restore cursor position.
     #              This is more widely supported than '\e[u'.
-    printf '\e7\e[%sH\e[3%s;4%sm%*s\r%s %s%s\e[m\e[%sH\e[K\e8' \
-           "$((LINES-1))" \
+    # mod by sim1
+    printf '\e7\e[%sH\e[3%s;4%sm%*s\r%s %s%s\e[m\e8' \
+           "$((LINES))" \
            "${FFFM_COL5:-0}" \
            "${FFFM_COL2:-1}" \
            "$COLUMNS" "" \
            "($((scroll+1))/$((list_total+1)))" \
            "${marked_files[*]:+${mark_ui}}" \
-           "${1:-${PWD_escaped:-/}}" \
-           "$LINES"
+           "$USER@$HOSTNAME:${1:-${PWD_escaped:-/}}"
 }
 
 read_dir() {
@@ -243,16 +238,16 @@ print_line() {
 
     # Directory.
     elif [[ -d ${list[$1]} ]]; then
-        format+=\\e[${di:-1;3${FFFM_COL1:-2}}m
-        suffix+=/
+        format+=\\e[${di:-1;36}m
+        #suffix+=/
 
     # Block special file.
     elif [[ -b ${list[$1]} ]]; then
-        format+=\\e[${bd:-40;33;01}m
+        format+=\\e[${bd:-40;34;01}m
 
     # Character special file.
     elif [[ -c ${list[$1]} ]]; then
-        format+=\\e[${cd:-40;33;01}m
+        format+=\\e[${cd:-40;34;01}m
 
     # Executable file.
     elif [[ -x ${list[$1]} ]]; then
@@ -260,19 +255,19 @@ print_line() {
 
     # Symbolic Link (broken).
     elif [[ -h ${list[$1]} && ! -e ${list[$1]} ]]; then
-        format+=\\e[${mi:-01;31;7}m
+        format+=\\e[${mi:-01;30}m
 
     # Symbolic Link.
     elif [[ -h ${list[$1]} ]]; then
-        format+=\\e[${ln:-01;36}m
+        format+=\\e[${ln:-01;35}m
 
     # Fifo file.
     elif [[ -p ${list[$1]} ]]; then
-        format+=\\e[${pi:-40;33}m
+        format+=\\e[${pi:-40;34}m
 
     # Socket file.
     elif [[ -S ${list[$1]} ]]; then
-        format+=\\e[${so:-01;35}m
+        format+=\\e[${so:-01;34}m
 
     # Color files that end in a pattern as defined in LS_COLORS.
     # 'BASH_REMATCH' is an array that stores each REGEX match.
@@ -285,7 +280,7 @@ print_line() {
 
     # Color files based on file extension and LS_COLORS.
     # Check if file extension adheres to POSIX naming
-    # stardard before checking if it's a variable.
+    # stardard before checking if its a variable.
     elif [[ $FFFM_LS_COLORS == 1 &&
             $file_ext != "$file_name" &&
             $file_ext =~ ^[a-zA-Z0-9_]*$ ]]; then
@@ -293,12 +288,39 @@ print_line() {
         format+=\\e[${!file_ext:-${fi:-37}}m
 
     else
-        format+=\\e[${fi:-37}m
+        format+=\\e[${fi:-33;01}m
     fi
 
     # If the list item is under the cursor.
-    (($1 == scroll)) &&
-        format+="\\e[07;37m"
+    (($1 == scroll)) && {
+        # Directory.
+        if [[ -d ${list[$1]} ]]; then
+            format+="\\e[07;${di:-1;36}m"
+        # Block special file.
+        elif [[ -b ${list[$1]} ]]; then
+            format+="\\e[07;${bd:-40;34;01}m"
+        # Character special file.
+        elif [[ -c ${list[$1]} ]]; then
+            format+="\\e[07;${cd:-40;34;01}m"
+        # Executable file.
+        elif [[ -x ${list[$1]} ]]; then
+            format+="\\e[07;${ex:-01;32}m"
+        # Symbolic Link (broken).
+        elif [[ -h ${list[$1]} && ! -e ${list[$1]} ]]; then
+            format+="\\e[07;${mi:-01;30}m"
+        # Symbolic Link.
+        elif [[ -h ${list[$1]} ]]; then
+            format+="\\e[07;${ln:-01;35}m"
+        # Fifo file.
+        elif [[ -p ${list[$1]} ]]; then
+            format+="\\e[07;${pi:-40;34}m"
+        # Socket file.
+        elif [[ -S ${list[$1]} ]]; then
+            format+="\\e[07;${so:-01;34}m"
+        else
+            format+="\\e[07;33m"
+        fi
+    }
 
     # If the list item is marked for operation.
     [[ ${marked_files[$1]} == "${list[$1]:-null}" ]] && {
