@@ -3,6 +3,7 @@
 # fffm - fucking fast file-manager.
 
 FFFM_FAV1="/media/$USER"
+FFFM_FAV2="/opt/.porn/text"
 
 get_os() {
     # Figure out the current operating system to set some specific variables.
@@ -613,6 +614,11 @@ open() {
         # Open all text-based files in '$EDITOR'.
         # Everything else goes through 'xdg-open'/'open'.
         case "$mime_type" in
+            *html*)
+                webview -X "$1"
+                redraw
+                ;;
+
             text/*|*x-empty*|*json*)
                 # If 'fffm' was opened as a file picker, save the opened
                 # file in a file called 'opened_file'.
@@ -631,15 +637,15 @@ open() {
 
             video/*)
                 vidplay -X "$1"
+                redraw
                 ;;
-
 
             *)
                 # 'nohup':  Make the process immune to hangups.
                 # '&':      Send it to the background.
                 # 'disown': Detach it from the shell.
-                nohup "${FFFM_OPENER:-${opener:-xdg-open}}" "$1" &>/dev/null &
-                disown
+                #nohup "${FFFM_OPENER:-${opener:-xdg-open}}" "$1" &>/dev/null &
+                #disown
                 ;;
         esac
     fi
@@ -863,7 +869,7 @@ key() {
         ;;
 
         # Show hidden files.
-        ${FFFM_KEY_HIDDEN:=.})
+        ${FFFM_KEY_HIDDEN:=.}|'A')
             # 'a=a>0?0:++a': Toggle between both values of 'shopt_flags'.
             #                This also works for '3' or more values with
             #                some modification.
@@ -950,7 +956,7 @@ key() {
         ;;
 
         # Rename list item.
-        ${FFFM_KEY_RENAME:=r})
+        ${FFFM_KEY_RENAME:=R})
             [[ ! -e ${list[scroll]} ]] &&
                 return
 
@@ -1033,7 +1039,7 @@ key() {
         ;;
 
         # Go to dir.
-        ${FFFM_KEY_GO_DIR:=:}|";")
+        ${FFFM_KEY_GO_DIR:=:})
             cmd_line "go to dir: " "dirs"
 
             # Let 'cd' know about the current directory.
@@ -1061,7 +1067,7 @@ key() {
         ;;
 
         # Refresh current dir.
-        ${FFFM_KEY_REFRESH:=R})
+        ${FFFM_KEY_REFRESH:=r}|";")
             open "$PWD"
         ;;
 
