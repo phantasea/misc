@@ -637,7 +637,7 @@ open() {
         # Everything else goes through 'xdg-open'/'open'.
         case "$mime_type" in
             *html*)
-                webview -X "$1"
+                webview "$1"
                 redraw
                 ;;
 
@@ -658,7 +658,7 @@ open() {
                 ;;
 
             video/*)
-                vidplay -X "$1"
+                vidplay "$1"
                 redraw
                 ;;
 
