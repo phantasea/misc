@@ -662,6 +662,11 @@ open() {
                 redraw
                 ;;
 
+            image/*)
+                imgview "$1"
+                redraw
+                ;;
+
             *)
                 # 'nohup':  Make the process immune to hangups.
                 # '&':      Send it to the background.
