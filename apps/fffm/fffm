@@ -393,7 +393,8 @@ draw_dir() {
 draw_img() {
     # Draw an image file on the screen using w3m-img.
     # We can use the framebuffer; set win_info_cmd as appropriate.
-    [[ $(tty) == /dev/tty[0-9]* && -w /dev/fb0 ]] &&
+    #[[ $(tty) == /dev/tty[0-9]* && -w /dev/fb0 ]] &&
+    [[ -z $DISPLAY && -w /dev/fb0 ]] &&
         win_info_cmd=fbset
 
     # X isn't running and we can't use the framebuffer, do nothing.
