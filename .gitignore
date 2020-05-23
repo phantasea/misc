@@ -1,1 +1,3 @@
 *.o
+apps/slock/config.h
+apps/slock/slock
