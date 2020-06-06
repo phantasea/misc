@@ -1,3 +1,6 @@
 *.o
 apps/slock/config.h
 apps/slock/slock
+apps/cmdfu/build
+apps/cmdfu/dist
+apps/cmdfu/fu.egg-info
