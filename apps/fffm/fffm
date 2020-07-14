@@ -976,7 +976,7 @@ key() {
         ;;
 
         # Clear all marked files.
-        ${FFFM_KEY_CLEAR:=c})
+        ${FFFM_KEY_CLEAR:=u})
             [[ ${marked_files[*]} ]] && {
                 marked_files=()
                 redraw
@@ -1049,7 +1049,7 @@ key() {
         ;;
 
         # Toggle executable flag.
-        ${FFFM_KEY_EXECUTABLE:=u})
+        ${FFFM_KEY_EXECUTABLE:=U})
             [[ -f ${list[scroll]} && -w ${list[scroll]} ]] && {
                 if [[ -x ${list[scroll]} ]]; then
                     chmod -x "${list[scroll]}"
@@ -1067,6 +1067,7 @@ key() {
         ;;
 
         # Go to dir.
+        ${FFFM_KEY_MOVE_ALL:=c}|\
         ${FFFM_KEY_GO_DIR:=:})
             cmd_line "go to dir: " "dirs"
 
