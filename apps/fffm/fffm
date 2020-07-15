@@ -4,6 +4,7 @@
 
 FFFM_FAV1="/media/$USER"
 FFFM_FAV2="/opt/.porn/text"
+FFFM_FAV3="/opt/conf"
 
 get_os() {
     # Figure out the current operating system to set some specific variables.
@@ -1067,8 +1068,7 @@ key() {
         ;;
 
         # Go to dir.
-        ${FFFM_KEY_MOVE_ALL:=c}|\
-        ${FFFM_KEY_GO_DIR:=:})
+        ${FFFM_KEY_GO_DIR:=:}|"c"|";")
             cmd_line "go to dir: " "dirs"
 
             # Let 'cd' know about the current directory.
@@ -1087,7 +1087,7 @@ key() {
         # Go to trash.
         ${FFFM_KEY_GO_TRASH:=t})
             get_os
-            open "$FFFM_TRASH"
+            open "$HOME/.Trash"
         ;;
 
         # Go to previous dir.
@@ -1096,7 +1096,7 @@ key() {
         ;;
 
         # Refresh current dir.
-        ${FFFM_KEY_REFRESH:=r}|";")
+        ${FFFM_KEY_REFRESH:=r})
             open "$PWD"
         ;;
 
