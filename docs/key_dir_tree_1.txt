@@ -1,0 +1,413 @@
+/home/simone/
+├── .abook/
+├── .adobe/
+├── .alias -> /opt/conf/alias
+├── .android/
+├── .apvlvinfo
+├── .apvlvrc -> /opt/conf/apvlvrc
+├── auds/
+├── .bash_history
+├── .bash_logout
+├── .bashrc -> /opt/conf/bashrc
+├── .cache/
+├── .certs/
+├── .compiz/
+├── .config/
+├── .dbus/
+├── .Desktop/
+├── .dictrc -> /opt/conf/dictrc
+├── .dircolors -> /opt/conf/dircolors
+├── .dmrc
+├── docs/
+├── .elinks -> /opt/conf/elinks/
+├── .favedirs -> /opt/conf/favedirs
+├── .fbtermrc -> /opt/conf/fbtermrc
+├── .fehbg*
+├── .fetchmailrc -> /opt/.priv/fetchmailrc
+├── .fimrc -> /opt/conf/fimrc
+├── .fonts -> /opt/misc/fonts/
+├── .forgit.bash -> /opt/conf/forgit.bash
+├── .fu
+├── .fu_cached_pickle
+├── .fzf -> /opt/apps/fzf/
+├── .fzf.bash -> /opt/conf/fzf.bash
+├── .gconf/
+├── .gitconfig -> /opt/conf/git/gitconfig
+├── .github-config.json
+├── .gnupg/
+├── .goto.sh -> /opt/conf/goto.sh
+├── .hhighlighter.sh -> /opt/conf/hhighlighter.sh
+├── .hushlogin
+├── .ICEauthority
+├── .inputrc -> /opt/conf/inputrc
+├── .less
+├── .lesshst
+├── .lesskey -> /opt/conf/lesskey
+├── .lnav/
+├── .local/
+├── .logs -> /opt/.logs//
+├── .lyrics/
+├── .macromedia/
+├── .mail -> /opt/.mail/
+├── .mailcap -> /opt/conf/mailcap
+├── misc/
+├── .moc -> /opt/conf/moc/
+├── .mozilla/
+├── .mplayer -> /opt/conf/mplayer//
+├── .msmtprc -> /opt/.priv/msmtprc
+├── .mutt -> /opt/conf/mutt/
+├── .muttrc -> /opt/conf/muttrc
+├── .ncmpcpp/
+├── .newsbeuter -> /opt/conf/newsbeuter//
+├── .npm/
+├── .pam_environment
+├── pics/
+├── .procmailrc -> /opt/conf/procmailrc
+├── .profile -> /opt/conf/profile
+├── .sc_history
+├── .scim/
+├── .scimrc -> /opt/conf/scimrc
+├── .sdcv_history
+├── .signature -> /opt/conf/signature
+├── .slit/
+├── .ssh/
+├── .stardict/
+├── .subversion/
+├── .sudo_as_admin_successful
+├── sync/
+├── .task -> /opt/conf/task/
+├── .taskrc -> /opt/conf/taskrc
+├── temp/
+├── .tigrc -> /opt/conf/tigrc
+├── .tmux.conf -> /opt/conf/tmux.conf
+├── TODO
+├── .tpp/
+├── .Trash/
+├── .tridactylrc -> /opt/conf/tridactylrc
+├── .urlview -> /opt/conf/urlview
+├── .util -> /opt/util/
+├── vids/
+├── .vifm -> /opt/conf/vifm//
+├── .vim -> /opt/conf/vim/
+├── .vimrc -> /opt/conf/vim/vimrc
+├── .visidatarc -> /opt/conf/visidatarc
+├── .vnstatrc -> /opt/conf/vnstatrc
+├── .w3m -> /opt/conf/w3m//
+├── .wallpaper -> /opt/conf/wallpaper//
+├── .wget-hsts
+├── .wgetrc -> /opt/conf/wgetrc
+├── .Xauthority
+├── .Xdefaults
+├── .xinitrc*
+├── .xinputrc
+├── .Xresources -> /opt/conf/Xresources
+├── .xsel.log
+├── .xsession-errors
+├── .xsession-errors.old
+├── .yong -> /opt/conf/yong/
+├── .zdict/
+└── .z.sh -> /opt/conf/z.sh
+
+49 directories, 59 files
+
+/opt/
+├── apps/
+├── auds/
+├── .certs/
+├── conf/
+├── .logs/
+├── lost+found/
+├── .mail/
+├── misc/
+├── net.downloadhelper.coapp/
+├── .porn/
+├── .priv/
+├── util/
+└── vids/
+
+13 directories, 0 files
+
+/opt/apps/
+├── adbfs/
+├── elinks/
+├── fbv/
+├── fim/
+├── fzf/
+├── htop/
+├── jfbview/
+├── moc/
+├── myst/
+├── pho/
+├── ranger/
+├── sc-im/
+├── vifm/
+├── vimiv/
+├── visidata/
+└── w3m/
+
+16 directories, 0 files
+
+/opt/conf/
+├── 51-android.rules
+├── abookrc
+├── alias
+├── apvlvrc
+├── bashrc
+├── bashtop/
+├── bat.config
+├── batwarn
+├── cgdbrc
+├── compton.conf
+├── dictrc
+├── dircolors
+├── dircolors.256dark
+├── dircolors.ansi-dark
+├── dircolors.xterm
+├── elinks/
+├── favedirs
+├── fbtermrc
+├── feh/
+├── fimrc
+├── fimrc(0.6)
+├── forgit.bash
+├── fstab
+├── fzf.bash
+├── git/
+├── .git/
+├── .gitignore
+├── .gitmodules
+├── goto.sh
+├── hhighlighter.sh
+├── i3wm/
+├── inputrc
+├── lesskey
+├── locale.nopurge
+├── lynx.cfg
+├── mailcap
+├── misc/
+├── moc/
+├── mpd.conf
+├── mplayer/
+├── mpv/
+├── mtab
+├── mutt/
+├── muttrc
+├── mykbd
+├── ncmpc/
+├── ncmpcpp/
+├── newsbeuter/
+├── noterc
+├── pentadactylrc
+├── pqivrc
+├── procmailrc
+├── profile
+├── pystartup
+├── ranger/
+├── rc.local*
+├── rtv.cfg
+├── scimrc
+├── siegerc
+├── signature
+├── sources.list
+├── streamlink.config
+├── surfraw/
+├── sweeprc
+├── sxiv/
+├── syncthing/
+├── task/
+├── taskrc
+├── tigrc
+├── tmux-256color.conf
+├── tmux.conf
+├── tridactyl/
+├── updatedb.conf
+├── urlview
+├── user-dirs.dirs
+├── user-dirs.locale
+├── vifm/
+├── vim/
+├── vimb/
+├── vimiv/
+├── vimperatorrc
+├── visidatarc
+├── vnstatrc
+├── w3m/
+├── wallpaper/
+├── wgetrc
+├── wvdialrc
+├── x41.ssh
+├── Xresources
+├── yong/
+├── zathura/
+├── z.sh
+└── zshrc
+
+28 directories, 65 files
+
+/opt/util/
+├── adbfs -> /opt/apps/adbfs/adbfs*
+├── asciinema*
+├── audcut*
+├── audplay*
+├── autoshut*
+├── avmux*
+├── bashtop*
+├── batmon*
+├── colors*
+├── extract*
+├── fbtmux*
+├── fffm*
+├── filemgr*
+├── fileopen*
+├── fileview*
+├── fmui -> /opt/misc/apps/fmui/fmui*
+├── fontpreview*
+├── fzfbuku*
+├── fzfimg*
+├── fzfmux*
+├── fzfopen*
+├── fzfpkg*
+├── fzfrg*
+├── fzfwifi*
+├── genm3u*
+├── .git/
+├── .gitignore
+├── gitupd*
+├── gotop*
+├── imgview*
+├── lsix*
+├── mailmgr*
+├── manmux*
+├── medinfo*
+├── misc/
+├── mudisk*
+├── musdo*
+├── musmux*
+├── mywall*
+├── pdfview*
+├── rg -> /opt/util/ripgrep*
+├── ripgrep*
+├── rssmux*
+├── sdel*
+├── startx*
+├── symlink*
+├── thumbnail*
+├── umpriv*
+├── vidcut*
+├── vidplay*
+├── vifmedit*
+├── vifmgoto*
+├── vifmimg*
+├── vifmmed*
+├── vifmrun*
+├── vimux*
+├── w3mimg*
+├── w3mimgdisp*
+├── w3mimgdisplay -> /usr/local/libexec/w3m/w3mimgdisplay*
+├── weather*
+├── webview*
+├── xinfo*
+└── x-is-run*
+
+2 directories, 61 files
+
+/opt/misc
+├── apps/
+│   ├── bash-4.4.tar.gz
+│   ├── bat_0.15.4_i386.deb
+│   ├── buku_3.2-1_all.deb
+│   ├── clerk_4.0.5-1_all.deb
+│   ├── cmdfu/
+│   ├── fbpdf/
+│   ├── fd_8.0.0_i386.deb
+│   ├── ffmpegthumbnailer/
+│   ├── fim-0.6-trunk.tar.gz
+│   ├── fmui/
+│   ├── fuse-7z(needs_waf).tar.gz
+│   ├── gotop_3.0.0_linux_386.tgz
+│   ├── hub-linux-386-2.13.0.tgz
+│   ├── imgp/
+│   ├── mdp/
+│   ├── moc_decoder_plugins.tar.gz
+│   ├── mujs/
+│   ├── ranger_devicons/
+│   ├── ranger_icon_plugin/
+│   ├── rar2fs/
+│   ├── ripgrep-11.0.2-i686-unknown-linux-musl.tar.gz
+│   ├── slock/
+│   ├── tabbed/
+│   ├── translate-shell/
+│   ├── tty-clock/
+│   ├── ttygif/
+│   ├── unrarsrc-5.2.3.tar.gz
+│   ├── vidir/
+│   ├── vifm_devicons/
+│   ├── visidata_1.5.2-1_all.deb
+│   ├── vt100.zip
+│   ├── waf.tar.gz
+│   ├── xterm.tar.gz
+│   └── yong-lin-2.5.0-0.7z
+├── dicts/
+│   ├── stardict-21shijishuangxiangcidian-big5-2.4.2/
+│   ├── stardict-21shijishuangyukejicidian-big5-2.4.2/
+│   ├── stardict-langdao-ce-big5-2.4.2/
+│   ├── stardict-langdao-ec-big5-2.4.2/
+│   ├── stardict-langdao-ec-gb-2.4.2/
+│   ├── stardict-oxford-big5-2.4.2/
+│   ├── stardict-xdict-ce-big5_fix-2.4.2/
+│   └── stardict-xdict-ec-big5_fix-2.4.2/
+├── docs/
+│   ├── 20160226-muenchen-fim.pdf
+│   ├── bookmarks.html
+│   ├── files-sandisks
+│   ├── fim-slides.pdf
+│   ├── forgit-README.md
+│   ├── GDB_Cheat_Sheet.pdf
+│   ├── github-git-cheat-sheet.pdf
+│   ├── grep_awk_sed.pdf
+│   ├── key_dirs.txt
+│   ├── key_dir_tree.txt
+│   ├── math_cheat_sheet_v2.6.pdf
+│   ├── NCURSES-Programming-HOWTO.pdf
+│   ├── NCURSES_Programming HOWTO.txt
+│   ├── Practical Vim.pdf
+│   ├── score Report.pdf
+│   ├── Screenshot_2019-11-27_fzf.png
+│   ├── scrot_20190915_190803.jpg
+│   ├── SedChart.pdf
+│   ├── snapshot-20190825172739.png
+│   ├── top-asian-porn-sites.doc
+│   ├── vifm-v0.10-builtin-normal.png
+│   ├── YinYangYu-1.gif
+│   ├── YinYangYu-2.gif
+│   └── YinYangYu-3.gif
+├── fonts/
+│   ├── install.sh*
+│   ├── Noto Mono for Powerline.ttf
+│   ├── Sauce Code Pro Light Nerd Font Complete Mono.ttf
+│   ├── Sauce Code Pro Light Nerd Font Complete.ttf
+│   ├── Sauce Code Pro Medium Nerd Font Complete Mono.ttf
+│   ├── Sauce Code Pro Medium Nerd Font Complete.ttf
+│   ├── Sauce Code Pro Nerd Font Complete Mono.ttf
+│   ├── Symbol Neu for Powerline.ttf
+│   ├── Ubuntu Mono Bold Nerd Font Complete Mono.ttf
+│   ├── Ubuntu Mono derivative Powerline Bold.ttf
+│   ├── Ubuntu Mono derivative Powerline.ttf
+│   └── Ubuntu Mono Nerd Font Complete Mono.ttf
+├── .git/
+│   ├── branches/
+│   ├── COMMIT_EDITMSG
+│   ├── config
+│   ├── description
+│   ├── HEAD
+│   ├── hooks/
+│   ├── index
+│   ├── info/
+│   ├── logs/
+│   ├── objects/
+│   ├── ORIG_HEAD
+│   ├── packed-refs
+│   └── refs/
+└── .gitignore
+
+36 directories, 61 files
