@@ -1,0 +1,43 @@
+# Ignore eclipse files
+.*project
+.settings
+.vscode
+.idea
+
+# Build files
+src/sngrep
+tests/test-*.log
+tests/test-*.trs
+tests/test-???
+*.o
+.deps
+.dirstamp
+*gmon.out
+src/config.h*
+src/stamp-h1
+
+.autotools
+Makefile
+Makefile.in
+aclocal.m4
+autom4te.cache
+config.log
+config.status
+config.sub
+config.guess
+configure
+missing
+install-sh
+depcomp
+test-driver
+
+# Ignore Doxygen generated files
+doc/html
+
+# Tags file
+tags
+TAGS
+
+# Vim swap files
+.*.swp
+.*.swo

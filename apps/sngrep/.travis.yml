@@ -1,0 +1,18 @@
+language: c
+compiler:
+  - clang
+  - gcc
+notifications:
+  recipients:
+    - kaian@irontec.com
+install:
+    - sudo apt-get -qq update || true
+    - sudo apt-get install -y libncurses5-dev libpcap-dev libssl-dev
+script: 
+    - ./bootstrap.sh
+    - ./configure 
+    - make
+branches:
+  only:
+    - master
+    - travis
