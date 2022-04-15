@@ -47,6 +47,11 @@ static Key keys[] = {
 	{ MODKEY|ShiftMask,     XK_k,      movetab,     { .i = +1 } },
 	{ MODKEY,               XK_Tab,    rotate,      { .i = 0 } },
 
+    /* add by sim1 */
+	{ MODKEY,               XK_n,      rotate,      { .i = +1 } },
+	{ MODKEY,               XK_p,      rotate,      { .i = -1 } },
+	{ MODKEY,               XK_h,      rotate,      { .i = 0 } },
+
 	{ MODKEY,               XK_grave,  spawn,       SETPROP("_TABBED_SELECT_TAB") },
 	{ MODKEY,               XK_1,      move,        { .i = 0 } },
 	{ MODKEY,               XK_2,      move,        { .i = 1 } },
