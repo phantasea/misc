@@ -1,0 +1,267 @@
+.TH RAR2FS 1 "v\ " "Thu, Jan 09, 2020" "User Commands"
+.SH NAME
+.B rar2fs
+\- FUSE file system for reading RAR archives
+.SH SYNOPSIS
+.B rar2fs
+[options] source target
+.SH DESCRIPTION
+.B rar2fs
+is a FUSE based file system that can mount a
+.I source
+RAR archive/volume or a directory containing any number of RAR archives on
+.I target
+and access (read only) the contents as plain files/directories. Other files located in the
+.I source
+directory are handled transparently. Both compressed and non-compressed (store) archives/volumes are supported but full media seek support (aka. indexing) is only available for non-compressed plaintext archives. If a RAR volume is selected as
+.I source
+the file specified must be the first in the set.
+.PP
+Since
+.B rar2fs
+is non-interactive, passwords that are required to decrypt encrypted archives should be stored in a file with the same name
+as the main archive/volume file but with a
+.I .pwd
+extension. It may also be prefixed with a dot
+.B '.'
+character to hide it from simple list operations in traditional UNIX style. The latter variant has less precedence than the former.
+It is also possible to specify a password per archive using the
+.I .rarconfig
+file described below.
+Be aware that a password must be stored in plaintext format and is thus not protected in any way from unauthorized access.
+.PP
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+.PP
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+You should have received a copy of the GNU General Public License along with this program. If not, see
+.I <http://www.gnu.org/licenses/>
+.br
+.SH OPTIONS
+Besides the standard FUSE options
+.B rar2fs
+accepts the following options that can be passed to the program.
+.TP
+.B \-\-seek-length=n
+set number of volume files that are traversed in search for headers [0=All]
+.PP
+.RS
+Normally the RAR specific header(s) describing the files contained in a volume is located in the first volume file. Providing a value of 1 here should thus be sufficient to cover most cases. The default is 0, meaning that the complete set of volumes files are searched for headers.
+The lower the value (starting from 1) the faster the display of folders containing a lot of RAR volumes (or volumes with a lot of files) will become since the number of open/search/close requests can be reduced but with less chance that all files are found and displayed.
+.PP
+It is also possible to specify the seek length per archive using the
+.I .rarconfig
+file described below. This adds the possibility to find all files without any significant performance loss.
+.RE
+.TP
+.B \-\-exclude="<file>[;<file>;...]"
+.TP
+.B \-\-exclude=<path>
+exclude file filter
+.PP
+.RS
+When file access is requested and the file can not be found on the local file system all RAR archives in target folder are also searched for it. Not until that last operation fails the file is considered missing. On some platforms certain files (eg. .lock files) are always accessed but are usually never to expect within a RAR archive.
+Specifying this option will treat the listed files differently. If not found on local file system they will
+.I never
+be searched for in the local RAR archives. This dramatically decrease the folder load/display time during 'ls' like operations on such systems.
+Each file in the list should be separated by a semi-colon
+.B ';'
+character.
+.PP
+It is also possible to use this option in such a way that it instead points to a file that lists the actual exclude filter. This is done by specifying an absolute file path (starting with '/') instead of a semi-colon separated list of file names. The file pointed to may contain more than one line but for each line files should be separated by a semi-colon
+.B ';'
+character.
+.RE
+.TP
+.B \-\-no-smp
+disable SMP support (bind to CPU #0)
+.PP
+.RS
+Note that this option is only available on Linux based platforms with support for the
+.I cpu_set_t
+type (GNU extension).
+.RE
+.TP
+.B \-\-save-eof
+force creation of .r2i files (end-of-file chunk) [EXPERIMENTAL]
+.PP
+.RS
+Index information is usually populated by the media player at the beginning of a playback session. Since the index table in most cases is stored at the end of the file, retrieving this information without the use of some post-processing is more or less impossible to perform in real-time for compressed/encrypted video streams. The
+.B mkr2i
+tool is intended to be used in such cases to make the index table available in a separate
+.I .r2i
+file.
+.PP
+Enabling this option will instead tell
+.B rar2fs
+to guess where the index information is located by analyzing the access pattern of the media player and then write the end-of-file chunk to an
+.I .r2i
+file automatically. This method is however less precise than when using the
+.B mkr2i
+tool. Expect an increase in size of the generated
+.I .r2i
+file compared to using the
+.B mkr2i
+tool directly. Start of playback will also be delayed since almost the entire archive needs to be extracted in order to access the data towards the end of the file and make it available for playback.
+.PP
+This option is only supported for AVI 1.0 and multi-part OpenDML (AVI 2.0) files created by a properly configured muxer. Badly configured muxers will expose themselves by generating invalid frame counts. The latter is automatically detected by
+.BR rar2fs .
+.PP
+It is also possible to enable/disable this option per archive using the
+.I .rarconfig
+file described below.
+.RE
+.TP
+.B \-\-no-lib-check
+disable dynamic library consistency check
+.PP
+.RS
+At startup
+.B rar2fs
+validates that the dynamic libraries
+.I libfuse.so
+and
+.I libunrar.so
+are compatible/consistent with what was used during compilation.
+Use this option to by-pass this check. Use of this option is discouraged.
+.RE
+.TP
+.B \-\-iob-size=n
+tune the size of the I/O buffer
+.PP
+.RS
+The I/O buffer is used to prefetch data at extraction of compressed or encrypted archives to make sure streaming is possible without delay due to disk or network I/O. Depending on the current system resources and network latency this buffer might need to be adjusted. A small buffer takes less resources but increase the chance that
+.B rar2fs
+must wait for data to arrive during a read request. On the other hand, a large buffer will increase memory footprint which may not always be desired. Also keep in mind that every file being extracted requires its own buffer. So the total memory resources required are always the buffer size multiplied by the number of active extraction threads. Be careful when choosing buffer size. There is no cap on the size itself. The only requirement is that it is a 'power of 2' Megabytes, eg. 1,2,4,8, etc. The default size is 4MiB.
+.RE
+.TP
+.B \-\-hist-size=n
+tune the size of I/O buffer history
+.PP
+.RS
+The I/O buffer history is a sliding window within the I/O buffer that is guaranteed to never be overwritten until future data has been consumed passed this limit. This means that, even though an extraction process can never be reversed, this part of the buffer can still deliver "historic" data within this window (eg. skipping backwards during movie playback). The size of the history buffer is expressed as a percentage of the total I/O buffer size between 0% and 75%. Specifying 0 here will completely disable this function. The default size is 50% of the total I/O buffer size.
+.RE
+.TP
+.B \-\-no-expand-cbr
+disable support for comic book RAR archives
+.PP
+.RS
+Default is to always expand comic book RAR archives. In the case that comic book readers are used that expect to find the original
+.I .cbr
+archive this option can be used to keep such files intact.
+.RE
+.TP
+.B \-\-relatime
+.TP
+.B \-\-relatime-rar
+update file access times relative to modify or change time
+.PP
+.RS
+By default
+.B rar2fs
+adhere to whatever access time update scheme is dictated by the underlying host file system. Since the host file system is unaware of files inside RAR archives the effect on those files will be that of 'noatime'. To overcome this limitation the
+.B \-\-relatime
+option may be used.
+See
+.BR mount (8)
+for a description of 'relatime' and other mount options related to timestamping.
+.PP
+Another issue with strictly relying on the host file system for timestamping is the effect on RAR volumes. Since reading
+data from a RAR volume might not access all files, only parts of the volume will obtain an updated timestamp. Tools relying on access time to clean up and delete "old" data might get fooled deleting only a subset of the volume resulting in a corrupt archive. By using the
+.B \-\-relatime-rar
+option this problem is eliminated by making sure all files in a volume set is always updated on access. Note that the underlying host file system must be writable and user needs sufficient permissions for this option to have any effect.
+.PP
+Except from what is described above the
+.B \-\-relatime-rar
+option has the same effect as
+.B \-\-relatime
+which effectively means that both these options does not need to be specified. Using
+.B \-\-relatime
+makes sense only if updates of the source RAR files are not wanted for some reason. There is a slight overhead inflicted by using
+.B \-\-relatime-rar
+since in the case of large RAR volume archives a lot of files will need a new timestamp. The access time is updated only at first read access after a file was opened which means overhead should be almost negligible.
+.RE
+.TP
+.B \-\-config=file
+specify per archive configuration file
+.PP
+.RS
+Use this file instead of the default
+.I .rarconfig
+that should be placed directly under the source folder.
+Refer to
+.I rarconfig.example
+for an explanation of syntax and details on how this feature can be used.
+.RE
+.TP
+.B \-\-date-rar
+use file date/timestamp from main archive file
+.PP
+.RS
+By default the dates/timestamps are collected from the meta data in the RAR archives.
+Use this option to instead force all initial dates/timestamps to be set according to the main RAR archive file. For volumes this means the first file in the set. If the
+.B \-\-relatime
+and/or
+.B  \-\-relatime-rar
+options are used it might affect the result of this option after mount time.
+.RE
+.TP
+.B \-\-no-inherit-perm
+do not inherit file permission mode from archive
+.PP
+.RS
+By default the file permission mode bits are inherited from whatever is stored in the archive. Sometimes this is not preferable.
+This option can be used to instead set the permission mode bits based on file type and current file mode creation mask, see
+.BR umask (1p).
+Another option is to use the FUSE \fIumask\fR mount option.
+The latter has the benefit of completely ignoring what ever the file system implementation sets but also has some caveats with respect to
+directories versus regular files.
+.br
+.SH MOUNT OPTIONS
+.RE
+.TP
+.B \-o locale=LOCALE
+set the locale to be used for RAR file name character set conversion
+.PP
+.RS
+Default is to set the current locale according to the \fILC_*/LC_CTYPE\fR environment variables.
+The need for translation of e.g. RAR encoded file names requires that a locale is explicitly set by \fBrar2fs\fR.
+Othwerwise it would default to the \fI"C"\fR locale, which is sufficient for file name stored as standard \fIASCII\fR, but would not
+translate deterministically for \fIUNICODE\fR file names.
+Since not all platforms have the possibility to manipulate environment variables directly, this mount option can be used to set a
+specific locale to be applied in such character set conversions. The possible values that may be assigned to \fBlocale\fR can
+easily be determined by the \fB`locale -a`\fR command.
+.RE
+.TP
+.B \-o warmup
+.TP
+.B \-o warmup=THREADS
+start background warmup of internal caches at mount time
+.PP
+.RS
+There are use-cases in which it makes sense to trigger a background warmup of the internal caches.
+This option only has an effect for folder style mounts. The default number of background workers started is 5.
+This can be tweaked by assigning a new warmup value. A warmup value of 0 will disable the function which is
+thus the same as not providing the option at all. On the other hand a too high number here might result in the
+current system limit for number of open files to be reached and the warmup will fail.
+The benefit of using this option compared to manually populating the caches
+by issuing e.g. a recursive \fB`ls -R`\fR or \fB`find`\fR command is that the internal warmup will
+operate directly on the source folder. This is a lot faster than going through the file system mount point which
+is required for the other alternatives. For stacked file systems the warmup, if used on both primary and
+secondary mounts simultaneously, will not perform optimally since file system accesses cannot be avoided
+in this case. While the performance is still expected to be a lot better than when not using this option,
+using it also on secondary mounts comes with a penalty highly depending on current setup.
+.br
+.SH "SEE ALSO"
+.br
+.BR mount (8),
+.BR mount.fuse (8),
+.BR fusermount (1)
+.PP
+Project home page
+.I <https://hasse69.github.io/rar2fs/>
+.SH AUTHOR
+.br
+.B Hans Beckerus
+.br
+.I \<hans.beckerus#AT#gmail.com\>
+
