@@ -1,4 +1,5 @@
 *.o
+bins/
 apps/slock/config.h
 apps/slock/slock
 apps/cmdfu/build
