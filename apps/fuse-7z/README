@@ -1,0 +1,49 @@
+= ABOUT =
+
+fuse-7z is a FUSE file system that uses the p7zip library to access:
+ - 7z archives
+ - all archive formats supported by 7-zip !!!
+
+At the moment, the design is in progress, see NOTES.
+The current draft is based on lib7zip, but it may change.
+
+= AUTHOR =
+
+Jérôme Carretero
+  * E-mail:     cJ-7z@zougloub.eu
+  * XMPP:       cJ@zougloub.eu
+  * Homepage:   http://zougloub.eu
+
+= LICENSE =
+
+fuse-7z is licensed under the GNU GPL v3.
+Read LICENCE for more information.
+
+= USAGE =
+
+The fuse-7z binary needs the directory containing 7z.so in $LD_LIBRARY_PATH.
+The shell wrapper wraps the call to fuse-7z to do that, and that's all.
+
+Mounting an archive with fuse-7z is like mounting another typical FUSE filesystem.  
+
+{{{
+$ fuse-7z --automount foobar.zip ~/mount
+(do something with the mounted file system)
+$ fusermount -u ~/mount
+}}}
+
+Note: --automount makes the target folder if not present.
+
+See the FUSE documentation for details.
+
+= NOTES =
+
+Currently, the code is in a proof of concept stage.
+This is not optimal but seems OK for the moment, to read archives.
+All the properties of all the files in the archive are read at initialization.
+But it happens to be quite fast.
+
+Only reads are planned at the moment, as the lib7zip library only supports them.
+Writes will come later, if they come : I have no idea on how to perform optimal writes on big archives,
+ and I don't know any real (sane) use case of writing in archives.
+
