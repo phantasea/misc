@@ -18,6 +18,10 @@ fi
 echo "Copying fonts..."
 eval $find_command | xargs -0 -I % cp "%" "$font_dir/"
 
+font_config_dir="$HOME/.config/fontconfig/conf.d"
+mkdir -p $font_config_dir
+cp "$powerline_fonts_dir/10-powerline-symbols.conf" "$font_config_dir/"
+
 # Reset font cache on Linux
 if command -v fc-cache @>/dev/null ; then
     echo "Resetting font cache, this may take a moment..."
