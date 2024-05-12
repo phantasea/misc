@@ -1,0 +1,1 @@
+﻿NDFramePage.OnPageTitleLoaded("File:.w3mplus/bin/uricheck","uricheck");NDSummary.OnSummaryLoaded("File:.w3mplus/bin/uricheck",[["ShellScript","ShellScript"]],[["Files","File"]],[[129,0,0,"uricheck","uricheck"]]);

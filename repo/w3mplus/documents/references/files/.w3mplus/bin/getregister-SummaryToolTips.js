@@ -1,0 +1,1 @@
+﻿NDSummary.OnToolTipsLoaded("File:.w3mplus/bin/getregister",{117:"<div class=\"NDToolTip TFile LShellScript\"><div class=\"TTSummary\">条件に一致するレジスタの値を取得する。</div></div>"});

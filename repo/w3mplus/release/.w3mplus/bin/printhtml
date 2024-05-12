@@ -1,0 +1,526 @@
+#!/usr/bin/env sh
+
+
+readonly 'VERSION=printhtml 3.1.1'
+
+
+
+set -efu
+umask '0022'
+readonly "LC_ALL_ORG=${LC_ALL-}"
+LC_ALL='C'
+IFS=$(printf ' \t\n_')
+IFS="${IFS%_}"
+PATH="${PATH-}${PATH:+:}$(command -p getconf 'PATH')"
+UNIX_STD='2003'         # HP-UX POSIX mode
+XPG_SUS_ENV='ON'        # AIX POSIX mode
+XPG_UNIX98='OFF'        # AIX UNIX 03 mode
+POSIXLY_CORRECT='1'     # GNU Coreutils POSIX mode
+COMMAND_MODE='unix2003' # macOS UNIX 03 mode
+export 'LC_ALL' 'IFS' 'PATH' 'UNIX_STD' 'XPG_SUS_ENV' 'XPG_UNIX98' 'POSIXLY_CORRECT' 'COMMAND_MODE'
+
+
+
+
+readonly 'EX_OK=0' # successful termination
+
+readonly 'EX__BASE=64' # base value for error messages
+
+readonly 'EX_USAGE=64'       # command line usage error
+readonly 'EX_DATAERR=65'     # data format error
+readonly 'EX_NOINPUT=66'     # cannot open input
+readonly 'EX_NOUSER=67'      # addressee unknown
+readonly 'EX_NOHOST=68'      # host name unknown
+readonly 'EX_UNAVAILABLE=69' # service unavailable
+readonly 'EX_SOFTWARE=70'    # internal software error
+readonly 'EX_OSERR=71'       # system error (e.g., can't fork)
+readonly 'EX_OSFILE=72'      # critical OS file missing
+readonly 'EX_CANTCREAT=73'   # can't create (user) output file
+readonly 'EX_IOERR=74'       # input/output error
+readonly 'EX_TEMPFAIL=75'    # temp failure; user is invited to retry
+readonly 'EX_PROTOCOL=76'    # remote error in protocol
+readonly 'EX_NOPERM=77'      # permission denied
+readonly 'EX_CONFIG=78'      # configuration error
+
+readonly 'EX__MAX=78' # maximum listed value
+
+trap 'case "${?}" in 0) end_call;; *) end_call "${EX_SOFTWARE}";; esac' 0 # EXIT
+trap 'end_call 129' 1                                                     # SIGHUP
+trap 'end_call 130' 2                                                     # SIGINT
+trap 'end_call 131' 3                                                     # SIGQUIT
+trap 'end_call 143' 15                                                    # SIGTERM
+
+alias org_lc='LC_ALL="${LC_ALL_ORG}"'
+
+
+end_call() {
+	trap '' 0 # EXIT
+	rm -fr -- ${tmpDir:+"${tmpDir}"}
+	exit "${1:-0}"
+}
+
+
+
+option_error() {
+	printf '%s: %s\n' "${0##*/}" "${1}" >&2
+	printf "詳細については '%s' を実行してください。\\n" "${0##*/} --help" >&2
+
+	end_call "${EX_USAGE}"
+}
+
+
+
+append_string() {
+	eval "${1}=\"\${${1}-}\${${1}:+\${3-}}\${2}\""
+}
+
+
+
+
+replace_all_fast() {
+	eval "$1=\${2//\"\$3\"/\"\$4\"}"
+}
+
+replace_all_posix() {
+	set -- "$1" "$2" "$3" "$4" ""
+	until [ _"$2" = _"${2#*"$3"}" ] && eval "$1=\$5\$2"; do
+		set -- "$1" "${2#*"$3"}" "$3" "$4" "$5${2%%"$3"*}$4"
+	done
+}
+
+replace_all_pattern() {
+	set -- "$1" "$2" "$3" "$4" ""
+	until eval "[ _\"\$2\" = _\"\${2#*$3}\" ] && $1=\$5\$2"; do
+		eval "set -- \"\$1\" \"\${2#*$3}\" \"\$3\" \"\$4\" \"\$5\${2%%$3*}\$4\""
+	done
+}
+
+meta_escape() {
+	if [ "${1#*\?}" ]; then # posh <= 0.5.4
+		set -- '\\\\:\\\\\\\\' '\\\[:[[]' '\\\?:[?]' '\\\*:[*]' '\\\$:[$]'
+	elif [ "${2%%\\*}" ]; then # bosh = all (>= 20181007), busybox <= 1.22.0
+		set -- '\\\\:\\\\\\\\' '\[:[[]' '\?:[?]' '\*:[*]' '\$:[$]'
+	else # POSIX compliant
+		set -- '\\:\\\\' '\[:[[]' '\?:[?]' '\*:[*]' '\$:[$]'
+	fi
+
+	set "$@" '\(:\\(' '\):\\)' '\|:\\|' '\":\\\"' '\`:\\\`' \
+		'\{:\\{' '\}:\\}' "\\':\\\\'" '\&:\\&' '\=:\\=' '\>:\\>' "end"
+
+	echo 'meta_escape() { set -- "$1" "$2" ""'
+	until [ "$1" = "end" ] && shift && printf '%s\n' "$@"; do
+		set -- "${1%:*}" "${1#*:}" "$@"
+		set -- "$@" 'until [ _"$2" = _"${2#*'"$1"'}" ] && set -- "$1" "$3$2" ""; do'
+		set -- "$@" '  set -- "$1" "${2#*'"$1"'}" "$3${2%%'"$1"'*}'"$2"'"'
+		set -- "$@" 'done'
+		shift 3
+	done
+	echo 'eval "$1=\"\$3\$2\""; }'
+}
+eval "$(meta_escape "a?" '\')"
+
+replace_all() {
+	(eval 'v="*#*/" p="#*/"; [ "${v//"$p"/-}" = "*-" ]') 2>/dev/null && return 0
+	[ "${1#"$2"}" = "a*b" ] && return 1 || return 2
+}
+eval 'replace_all "a*b" "a[*]" &&:' && :
+case $? in
+0) # Fast version (Not POSIX compliant)
+	replace_all() { replace_all_fast "$@"; } ;;
+1) # POSIX version (POSIX compliant)
+	replace_all() { replace_all_posix "$@"; } ;;
+2) # Pattern version
+	replace_all() {
+		meta_escape "$1" "$3"
+		eval "replace_all_pattern \"\$1\" \"\$2\" \"\${$1}\" \"\$4\""
+	} ;;
+esac
+
+replace_multiple() {
+	eval "${1}=\"\${2}\""
+	eval "shift 2; set -- '${1}'" '${@+"${@}"}'
+
+	while [ 2 -le "${#}" ]; do
+		eval 'replace_all "${1}"' "\"\${${1}}\"" '"${2}" "${3-}"'
+
+		case "${#}" in
+		'2') set -- ;;
+		*) eval "shift 3; set -- '${1}'" '${@+"${@}"}' ;;
+		esac
+	done
+}
+
+
+html_escape() {
+	replace_multiple "${1}" "${2}" '&' '&amp;' '<' '&lt;' '>' '&gt;' "'" '&#39;' '"' '&quot;'
+}
+
+
+
+
+
+
+replace_all_fast() {
+	eval "$1=\${2//\"\$3\"/\"\$4\"}"
+}
+
+replace_all_posix() {
+	set -- "$1" "$2" "$3" "$4" ""
+	until [ _"$2" = _"${2#*"$3"}" ] && eval "$1=\$5\$2"; do
+		set -- "$1" "${2#*"$3"}" "$3" "$4" "$5${2%%"$3"*}$4"
+	done
+}
+
+replace_all_pattern() {
+	set -- "$1" "$2" "$3" "$4" ""
+	until eval "[ _\"\$2\" = _\"\${2#*$3}\" ] && $1=\$5\$2"; do
+		eval "set -- \"\$1\" \"\${2#*$3}\" \"\$3\" \"\$4\" \"\$5\${2%%$3*}\$4\""
+	done
+}
+
+meta_escape() {
+	if [ "${1#*\?}" ]; then # posh <= 0.5.4
+		set -- '\\\\:\\\\\\\\' '\\\[:[[]' '\\\?:[?]' '\\\*:[*]' '\\\$:[$]'
+	elif [ "${2%%\\*}" ]; then # bosh = all (>= 20181007), busybox <= 1.22.0
+		set -- '\\\\:\\\\\\\\' '\[:[[]' '\?:[?]' '\*:[*]' '\$:[$]'
+	else # POSIX compliant
+		set -- '\\:\\\\' '\[:[[]' '\?:[?]' '\*:[*]' '\$:[$]'
+	fi
+
+	set "$@" '\(:\\(' '\):\\)' '\|:\\|' '\":\\\"' '\`:\\\`' \
+		'\{:\\{' '\}:\\}' "\\':\\\\'" '\&:\\&' '\=:\\=' '\>:\\>' "end"
+
+	echo 'meta_escape() { set -- "$1" "$2" ""'
+	until [ "$1" = "end" ] && shift && printf '%s\n' "$@"; do
+		set -- "${1%:*}" "${1#*:}" "$@"
+		set -- "$@" 'until [ _"$2" = _"${2#*'"$1"'}" ] && set -- "$1" "$3$2" ""; do'
+		set -- "$@" '  set -- "$1" "${2#*'"$1"'}" "$3${2%%'"$1"'*}'"$2"'"'
+		set -- "$@" 'done'
+		shift 3
+	done
+	echo 'eval "$1=\"\$3\$2\""; }'
+}
+eval "$(meta_escape "a?" '\')"
+
+replace_all() {
+	(eval 'v="*#*/" p="#*/"; [ "${v//"$p"/-}" = "*-" ]') 2>/dev/null && return 0
+	[ "${1#"$2"}" = "a*b" ] && return 1 || return 2
+}
+eval 'replace_all "a*b" "a[*]" &&:' && :
+case $? in
+0) # Fast version (Not POSIX compliant)
+	replace_all() { replace_all_fast "$@"; } ;;
+1) # POSIX version (POSIX compliant)
+	replace_all() { replace_all_posix "$@"; } ;;
+2) # Pattern version
+	replace_all() {
+		meta_escape "$1" "$3"
+		eval "replace_all_pattern \"\$1\" \"\$2\" \"\${$1}\" \"\$4\""
+	} ;;
+esac
+
+replace_multiple() {
+	eval "${1}=\"\${2}\""
+	eval "shift 2; set -- '${1}'" '${@+"${@}"}'
+
+	while [ 2 -le "${#}" ]; do
+		eval 'replace_all "${1}"' "\"\${${1}}\"" '"${2}" "${3-}"'
+
+		case "${#}" in
+		'2') set -- ;;
+		*) eval "shift 3; set -- '${1}'" '${@+"${@}"}' ;;
+		esac
+	done
+}
+
+
+remove_control_character() {
+	set -- "${1}" "${2}" "${3}" "$(printf '\001\002\003\004\005\006\007\010\011\012\013\014\015\016\017\020\021\022\023\024\025\026\027\030\031\032\033\034\035\036\037\177\200\201\202\203\204\205\206\207\210\211\212\213\214')"
+
+	while [ -n "${3}" ]; do
+		replace_all "${1}" "${4}" "${3%%${3#?}}" ''
+
+		eval 'set -- "${1}" "${2}" "${3#?}"' "\"\${${1}}\""
+	done
+
+	set -- "${1}" "${2}" "${4}" ''
+
+	while [ -n "${3}" ]; do
+		set -- "${1}" "${2}" "${3#?}" "${4} '${3%%${3#?}}' ''"
+	done
+
+	eval 'replace_multiple "${1}" "${2}"' "${4}"
+}
+
+
+safe_string() {
+	remove_control_character "${1}" "${2}" "$(printf '\t\n\r')"
+}
+
+
+html_safetext() {
+	eval "${1}=\"\${2}\""
+	eval 'safe_string "${1}"' "\"\${${1}}\""
+	eval 'html_escape "${1}"' "\"\${${1}}\""
+}
+
+parser_definition() {
+	setup REST abbr:true error:option_error plus:true no:0 help:usage \
+		-- 'Usage:' "  ${2##*/} [OPTION]... [FILE]..." \
+		'' 'Options:'
+
+	param :'append_string "HEAD_CONTENT" "${OPTARG}"' -H --head-content var:ELEMENT -- 'head要素内に ELEMENT を追加する'
+	flag HEAD_CONTENT --no-head-content init:@no on: no: -- '-H, --head-content をリセットする'
+	param :'html_safetext "TITLE" "${OPTARG}"' -t --title init:='No Title' var:TEXT -- 'ページのタイトルを指定する'
+	param W3MPLUS_TEMPLATE_HTML -T --template init:@none var:FILE -- 'テンプレートファイルを指定する'
+	disp :usage -h --help -- 'このヘルプを表示して終了する'
+	disp VERSION -v --version -- 'バージョン情報を表示して終了する'
+
+	msg -- '' 'Exit Status:' \
+		'    0 - successful termination' \
+		'   64 - command line usage error' \
+		'   65 - data format error' \
+		'   66 - cannot open input' \
+		'   67 - addressee unknown' \
+		'   68 - host name unknown' \
+		'   69 - service unavailable' \
+		'   70 - internal software error' \
+		"   71 - system error (e.g., can't fork)" \
+		'   72 - critical OS file missing' \
+		"   73 - can't create (user) output file" \
+		'   74 - input/output error' \
+		'   75 - temp failure; user is invited to retry' \
+		'   76 - remote error in protocol' \
+		'   77 - permission denied' \
+		'   78 - configuration error' \
+		'  129 - received SIGHUP' \
+		'  130 - received SIGINT' \
+		'  131 - received SIGQUIT' \
+		'  143 - received SIGTERM'
+
+	msg -- '' 'Environment Variables:' \
+		'  W3MPLUS_HTML_PROGRAM - HTML 用の呼び出しコマンド'
+}
+
+HEAD_CONTENT=''
+OPTARG='No Title'
+html_safetext "TITLE" "${OPTARG}"
+REST=''
+parse() {
+	OPTIND=$(($# + 1))
+	while OPTARG= && [ $# -gt 0 ]; do
+		set -- "${1%%\=*}" "${1#*\=}" "$@"
+		while [ ${#1} -gt 2 ]; do
+			case $1 in *[!a-zA-Z0-9_-]*) break ;; esac
+			case '--head-content' in
+			"$1")
+				OPTARG=
+				break
+				;;
+			$1*) OPTARG="$OPTARG --head-content" ;;
+			esac
+			case '--no-head-content' in
+			"$1")
+				OPTARG=
+				break
+				;;
+			$1*) OPTARG="$OPTARG --no-head-content" ;;
+			esac
+			case '--title' in
+			"$1")
+				OPTARG=
+				break
+				;;
+			$1*) OPTARG="$OPTARG --title" ;;
+			esac
+			case '--template' in
+			"$1")
+				OPTARG=
+				break
+				;;
+			$1*) OPTARG="$OPTARG --template" ;;
+			esac
+			case '--help' in
+			"$1")
+				OPTARG=
+				break
+				;;
+			$1*) OPTARG="$OPTARG --help" ;;
+			esac
+			case '--version' in
+			"$1")
+				OPTARG=
+				break
+				;;
+			$1*) OPTARG="$OPTARG --version" ;;
+			esac
+			break
+		done
+		case ${OPTARG# } in
+		*\ *)
+			eval "set -- $OPTARG $1 $OPTARG"
+			OPTIND=$((($# + 1) / 2)) OPTARG=$1
+			shift
+			while [ $# -gt "$OPTIND" ]; do
+				OPTARG="$OPTARG, $1"
+				shift
+			done
+			set "Ambiguous option: $1 (could be $OPTARG)" ambiguous "$@"
+			option_error "$@" >&2 || exit $?
+			echo "$1" >&2
+			exit 1
+			;;
+		?*)
+			[ "$2" = "$3" ] || OPTARG="$OPTARG=$2"
+			shift 3
+			eval 'set -- "${OPTARG# }"' ${1+'"$@"'}
+			OPTARG=
+			;;
+		*) shift 2 ;;
+		esac
+		case $1 in
+		--?*=*)
+			OPTARG=$1
+			shift
+			eval 'set -- "${OPTARG%%\=*}" "${OPTARG#*\=}"' ${1+'"$@"'}
+			;;
+		--no-* | --without-*) unset OPTARG ;;
+		-[HtT]?*)
+			OPTARG=$1
+			shift
+			eval 'set -- "${OPTARG%"${OPTARG#??}"}" "${OPTARG#??}"' ${1+'"$@"'}
+			;;
+		-[hv]?*)
+			OPTARG=$1
+			shift
+			eval 'set -- "${OPTARG%"${OPTARG#??}"}" -"${OPTARG#??}"' ${1+'"$@"'}
+			OPTARG=
+			;;
+		+*) unset OPTARG ;;
+		esac
+		case $1 in
+		'-H' | '--head-content')
+			[ $# -le 1 ] && set "required" "$1" && break
+			OPTARG=$2
+			append_string "HEAD_CONTENT" "${OPTARG}"
+			shift
+			;;
+		'--no-head-content')
+			[ "${OPTARG:-}" ] && OPTARG=${OPTARG#*\=} && set "noarg" "$1" && break
+			eval '[ ${OPTARG+x} ] &&:' && OPTARG='' || OPTARG=''
+			HEAD_CONTENT="$OPTARG"
+			;;
+		'-t' | '--title')
+			[ $# -le 1 ] && set "required" "$1" && break
+			OPTARG=$2
+			html_safetext "TITLE" "${OPTARG}"
+			shift
+			;;
+		'-T' | '--template')
+			[ $# -le 1 ] && set "required" "$1" && break
+			OPTARG=$2
+			W3MPLUS_TEMPLATE_HTML="$OPTARG"
+			shift
+			;;
+		'-h' | '--help')
+			usage
+			exit 0
+			;;
+		'-v' | '--version')
+			echo "${VERSION}"
+			exit 0
+			;;
+		--)
+			shift
+			while [ $# -gt 0 ]; do
+				REST="${REST} \"\${$((OPTIND - $#))}\""
+				shift
+			done
+			break
+			;;
+		[-+]?*)
+			set "unknown" "$1"
+			break
+			;;
+		*)
+			REST="${REST} \"\${$((OPTIND - $#))}\""
+			;;
+		esac
+		shift
+	done
+	[ $# -eq 0 ] && {
+		OPTIND=1
+		unset OPTARG
+		return 0
+	}
+	case $1 in
+	unknown) set "Unrecognized option: $2" "$@" ;;
+	noarg) set "Does not allow an argument: $2" "$@" ;;
+	required) set "Requires an argument: $2" "$@" ;;
+	pattern:*) set "Does not match the pattern (${1#*:}): $2" "$@" ;;
+	notcmd) set "Not a command: $2" "$@" ;;
+	*) set "Validation error ($1): $2" "$@" ;;
+	esac
+	option_error "$@" >&2 || exit $?
+	echo "$1" >&2
+	exit 1
+}
+usage() {
+	cat <<'GETOPTIONSHERE'
+Usage:
+  printhtml [OPTION]... [FILE]...
+
+Options:
+  -H,     --head-content ELEMENT 
+                              head要素内に ELEMENT を追加する
+          --no-head-content   -H, --head-content をリセットする
+  -t,     --title TEXT        ページのタイトルを指定する
+  -T,     --template FILE     テンプレートファイルを指定する
+  -h,     --help              このヘルプを表示して終了する
+  -v,     --version           バージョン情報を表示して終了する
+
+Exit Status:
+    0 - successful termination
+   64 - command line usage error
+   65 - data format error
+   66 - cannot open input
+   67 - addressee unknown
+   68 - host name unknown
+   69 - service unavailable
+   70 - internal software error
+   71 - system error (e.g., can't fork)
+   72 - critical OS file missing
+   73 - can't create (user) output file
+   74 - input/output error
+   75 - temp failure; user is invited to retry
+   76 - remote error in protocol
+   77 - permission denied
+   78 - configuration error
+  129 - received SIGHUP
+  130 - received SIGINT
+  131 - received SIGQUIT
+  143 - received SIGTERM
+
+Environment Variables:
+  W3MPLUS_HTML_PROGRAM - HTML 用の呼び出しコマンド
+GETOPTIONSHERE
+}
+
+parse ${@+"${@}"}
+eval "set -- ${REST}"
+
+export 'HEAD' 'TITLE' 'W3MPLUS_TEMPLATE_HTML'
+
+case "${W3MPLUS_TEMPLATE_HTML-}" in
+'')
+	printf '<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><title>%s</title>%s</head><body><main>' "${TITLE}" "${HEAD_CONTENT}"
+
+	case "${#}" in [!0]*)
+		cat -- ${@+"${@}"} | tr -d '\000-\010\013\014\016-\037\177-\214'
+		;;
+	esac
+
+	printf '</main></body></html>'
+	;;
+*) org_lc sh -c "${W3MPLUS_HTML_PROGRAM} \${@+\"\${@}\"}" 'sh' ${@+"${@}"} ;;
+esac

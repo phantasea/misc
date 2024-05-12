@@ -1,0 +1,94 @@
+#!/bin/sh
+
+
+urlencode() (
+
+	set -eu
+	umask 0022
+	export LC_ALL=C
+	export PATH="$(command -p getconf PATH 2>/dev/null)${PATH+:}${PATH-}"
+	case $PATH in :*) PATH=${PATH#?} ;; esac
+	export UNIX_STD=2003 # to make HP-UX conform to POSIX
+
+	print_usage_and_exit() {
+		cat <<-USAGE 1>&2
+			Usage   : ${0##*/} [-r|--raw] <file> ...
+			Args    : <file> ...... Text file for URL encoding
+			Options : -r, --raw ... RAW MODE :
+			                        " " will not be converted into "+" but "%20"
+			Version : 2020-05-06 22:42:19 JST
+			          (POSIX Bourne Shell/POSIX commands)
+		USAGE
+		exit 1
+	}
+
+
+	case "${1:-}" in
+	--help | --version | -h) print_usage_and_exit ;;
+	esac
+
+	instead_of_spc='+'
+	case $# in [!0]*)
+		for arg in ${1+"$@"}; do
+			case "$arg" in
+			-r | --raw)
+				instead_of_spc='%20'
+				shift
+				break
+				;;
+			--)
+				shift
+				break
+				;;
+			*) : ;;
+			esac
+		done
+		;;
+	esac
+
+
+	(
+		cat ${1+"$@"}
+		echo ''
+	) |
+		awk '                                                            #
+BEGIN {                                                          #
+  OFS = "";                                                      #
+  ORS = "";                                                      #
+  for(i= 0;i<256;i++){c2p[sprintf("%c",i)]=sprintf("%%%02X",i);} #
+  c2p[" "]="'"$instead_of_spc"'";                                #
+  for(i=48;i< 58;i++){c2p[sprintf("%c",i)]=sprintf("%c",i);    } #
+  for(i=65;i< 91;i++){c2p[sprintf("%c",i)]=sprintf("%c",i);    } #
+  for(i=97;i<123;i++){c2p[sprintf("%c",i)]=sprintf("%c",i);    } #
+  c2p["-"]="-"; c2p["."]="."; c2p["_"]="_"; c2p["~"]="~";        #
+  while (getline line) {                                         #
+    for (i=1; i<=length(line); i++) {                            #
+      print c2p[substr(line,i,1)];                               #
+    }                                                            #
+    print "\n";                                                  #
+  }                                                              #
+}' |
+		awk '                                                            #
+BEGIN{                                                           #
+  ORS="";                                                        #
+  OFS="";                                                        #
+  getline line;                                                  #
+  print line;                                                    #
+  while (getline line) {                                         #
+    print "\n",line;                                             #
+  }                                                              #
+}                                                                #
+'
+)
+
+(
+	urlencode --raw -- ${@+"${@}"}
+	echo
+) | awk -- 'BEGIN {
+	getline line
+	printf("%s", line)
+
+	while(getline line) {
+		printf("%%0A%s", line)
+	}
+}'

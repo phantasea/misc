@@ -1,0 +1,143 @@
+#!/usr/bin/env sh
+
+### Script: printhtml
+##
+## HTML ページを作成する。
+##
+## Metadata:
+##
+##   id - 5ab6e89a-d4eb-4c8d-b1bc-02bab2962639
+##   author - <qq542vev at https://purl.org/meta/me/>
+##   version - 3.1.1
+##   date - 2022-12-10
+##   since - 2019-07-29
+##   copyright - Copyright (C) 2019-2022 qq542vev. Some rights reserved.
+##   license - <CC-BY at https://creativecommons.org/licenses/by/4.0/>
+##   package - w3mplus
+##
+## See Also:
+##
+##   * <Project homepage at https://github.com/qq542vev/w3mplus>
+##   * <Bug report at https://github.com/qq542vev/w3mplus/issues>
+##
+## Help Output:
+##
+## ------ Text ------
+## Usage:
+##   printhtml [OPTION]... [FILE]...
+##
+## Options:
+##   -H,     --head ELEMENT      head要素内に ELEMENT を追加する
+##           --no-head           -H, --head をリセットする
+##   -t,     --title TEXT        ページのタイトルを指定する
+##   -T,     --template FILE     テンプレートファイルを指定する
+##   -h,     --help              このヘルプを表示して終了する
+##   -v,     --version           バージョン情報を表示して終了する
+##
+## Exit Status:
+##     0 - successful termination
+##    64 - command line usage error
+##    65 - data format error
+##    66 - cannot open input
+##    67 - addressee unknown
+##    68 - host name unknown
+##    69 - service unavailable
+##    70 - internal software error
+##    71 - system error (e.g., can't fork)
+##    72 - critical OS file missing
+##    73 - can't create (user) output file
+##    74 - input/output error
+##    75 - temp failure; user is invited to retry
+##    76 - remote error in protocol
+##    77 - permission denied
+##    78 - configuration error
+##   129 - received SIGHUP
+##   130 - received SIGINT
+##   131 - received SIGQUIT
+##   143 - received SIGTERM
+## ------------------
+
+readonly 'VERSION=printhtml 3.1.1'
+
+. 'initialize.sh'
+. 'option_error.sh'
+. 'append_string.sh'
+. 'html_escape.sh'
+. 'safe_string.sh'
+
+### Function: html_safetext
+##
+## HTML での安全な文字列に変換する。
+##
+## Parameters:
+##
+##   $1 - 結果を代入する変数名。
+##   $2 - 対象の文字列。
+
+html_safetext() {
+	eval "${1}=\"\${2}\""
+	eval 'safe_string "${1}"' "\"\${${1}}\""
+	eval 'html_escape "${1}"' "\"\${${1}}\""
+}
+
+# @getoptions
+parser_definition() {
+	setup REST abbr:true error:option_error plus:true no:0 help:usage \
+		-- 'Usage:' "  ${2##*/} [OPTION]... [FILE]..." \
+		'' 'Options:'
+
+	param :'append_string "HEAD_CONTENT" "${OPTARG}"' -H --head-content var:ELEMENT -- 'head要素内に ELEMENT を追加する'
+	flag  HEAD_CONTENT         --no-head-content init:@no on: no: -- '-H, --head-content をリセットする'
+	param :'html_safetext "TITLE" "${OPTARG}"' -t --title init:='No Title' var:TEXT -- 'ページのタイトルを指定する'
+	param W3MPLUS_TEMPLATE_HTML -T --template init:@none var:FILE -- 'テンプレートファイルを指定する'
+	disp  :usage  -h --help    -- 'このヘルプを表示して終了する'
+	disp  VERSION -v --version -- 'バージョン情報を表示して終了する'
+
+	msg -- '' 'Exit Status:' \
+		'    0 - successful termination' \
+		'   64 - command line usage error' \
+		'   65 - data format error' \
+		'   66 - cannot open input' \
+		'   67 - addressee unknown' \
+		'   68 - host name unknown' \
+		'   69 - service unavailable' \
+		'   70 - internal software error' \
+		"   71 - system error (e.g., can't fork)" \
+		'   72 - critical OS file missing' \
+		"   73 - can't create (user) output file" \
+		'   74 - input/output error' \
+		'   75 - temp failure; user is invited to retry' \
+		'   76 - remote error in protocol' \
+		'   77 - permission denied' \
+		'   78 - configuration error' \
+		'  129 - received SIGHUP' \
+		'  130 - received SIGINT' \
+		'  131 - received SIGQUIT' \
+		'  143 - received SIGTERM'
+
+	msg -- '' 'Environment Variables:' \
+		'  W3MPLUS_HTML_PROGRAM - HTML 用の呼び出しコマンド'
+}
+# @end
+
+# @gengetoptions parser -i parser_definition parse "${1}"
+# @end
+
+eval "$(getoptions parser_definition parse "${0}")"
+parse ${@+"${@}"}
+eval "set -- ${REST}"
+
+export 'HEAD' 'TITLE' 'W3MPLUS_TEMPLATE_HTML'
+
+case "${W3MPLUS_TEMPLATE_HTML-}" in
+	'')
+		printf '<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="UTF-8" /><title>%s</title>%s</head><body><main>' "${TITLE}" "${HEAD_CONTENT}"
+
+		case "${#}" in [!0]*)
+			cat -- ${@+"${@}"} | tr -d '\000-\010\013\014\016-\037\177-\214'
+		esac
+
+		printf '</main></body></html>'
+		;;
+	*) org_lc sh -c "${W3MPLUS_HTML_PROGRAM} \${@+\"\${@}\"}" 'sh' ${@+"${@}"};;
+esac

@@ -1,0 +1,490 @@
+#!/usr/bin/env sh
+
+
+readonly 'VERSION=protectionpage 1.2.1'
+
+: ${W3MPLUS_HOME:="${HOME}/.w3mplus"}
+: ${W3MPLUS_CACHE:="${W3MPLUS_HOME}/cache"}
+: ${W3MPLUS_PATH:="${W3MPLUS_HOME}/bin"}
+: ${W3MPLUS_LIB:="${W3MPLUS_HOME}/lib"}
+
+: ${SCRIPT_NAME:="cgi-bin/${0##*/}"}
+: ${QUERY_STRING:=''}
+: ${REQUEST_URI:="${SCRIPT_NAME}${QUERY_STRING:+?}${QUERY_STRING-}"}
+
+export PATH="${W3MPLUS_PATH}:${W3MPLUS_LIB}${PATH:+:}${PATH-}"
+export AWKPATH="${W3MPLUS_LIB}${AWKPATH:+:}${AWKPATH-}"
+
+
+
+set -efu
+umask '0022'
+readonly "LC_ALL_ORG=${LC_ALL-}"
+LC_ALL='C'
+IFS=$(printf ' \t\n_')
+IFS="${IFS%_}"
+PATH="${PATH-}${PATH:+:}$(command -p getconf 'PATH')"
+UNIX_STD='2003'         # HP-UX POSIX mode
+XPG_SUS_ENV='ON'        # AIX POSIX mode
+XPG_UNIX98='OFF'        # AIX UNIX 03 mode
+POSIXLY_CORRECT='1'     # GNU Coreutils POSIX mode
+COMMAND_MODE='unix2003' # macOS UNIX 03 mode
+export 'LC_ALL' 'IFS' 'PATH' 'UNIX_STD' 'XPG_SUS_ENV' 'XPG_UNIX98' 'POSIXLY_CORRECT' 'COMMAND_MODE'
+
+
+
+
+readonly 'EX_OK=0' # successful termination
+
+readonly 'EX__BASE=64' # base value for error messages
+
+readonly 'EX_USAGE=64'       # command line usage error
+readonly 'EX_DATAERR=65'     # data format error
+readonly 'EX_NOINPUT=66'     # cannot open input
+readonly 'EX_NOUSER=67'      # addressee unknown
+readonly 'EX_NOHOST=68'      # host name unknown
+readonly 'EX_UNAVAILABLE=69' # service unavailable
+readonly 'EX_SOFTWARE=70'    # internal software error
+readonly 'EX_OSERR=71'       # system error (e.g., can't fork)
+readonly 'EX_OSFILE=72'      # critical OS file missing
+readonly 'EX_CANTCREAT=73'   # can't create (user) output file
+readonly 'EX_IOERR=74'       # input/output error
+readonly 'EX_TEMPFAIL=75'    # temp failure; user is invited to retry
+readonly 'EX_PROTOCOL=76'    # remote error in protocol
+readonly 'EX_NOPERM=77'      # permission denied
+readonly 'EX_CONFIG=78'      # configuration error
+
+readonly 'EX__MAX=78' # maximum listed value
+
+trap 'case "${?}" in 0) end_call;; *) end_call "${EX_SOFTWARE}";; esac' 0 # EXIT
+trap 'end_call 129' 1                                                     # SIGHUP
+trap 'end_call 130' 2                                                     # SIGINT
+trap 'end_call 131' 3                                                     # SIGQUIT
+trap 'end_call 143' 15                                                    # SIGTERM
+
+alias org_lc='LC_ALL="${LC_ALL_ORG}"'
+
+
+end_call() {
+	trap '' 0 # EXIT
+	rm -fr -- ${tmpDir:+"${tmpDir}"}
+	exit "${1:-0}"
+}
+
+
+
+
+replace_all_fast() {
+	eval "$1=\${2//\"\$3\"/\"\$4\"}"
+}
+
+replace_all_posix() {
+	set -- "$1" "$2" "$3" "$4" ""
+	until [ _"$2" = _"${2#*"$3"}" ] && eval "$1=\$5\$2"; do
+		set -- "$1" "${2#*"$3"}" "$3" "$4" "$5${2%%"$3"*}$4"
+	done
+}
+
+replace_all_pattern() {
+	set -- "$1" "$2" "$3" "$4" ""
+	until eval "[ _\"\$2\" = _\"\${2#*$3}\" ] && $1=\$5\$2"; do
+		eval "set -- \"\$1\" \"\${2#*$3}\" \"\$3\" \"\$4\" \"\$5\${2%%$3*}\$4\""
+	done
+}
+
+meta_escape() {
+	if [ "${1#*\?}" ]; then # posh <= 0.5.4
+		set -- '\\\\:\\\\\\\\' '\\\[:[[]' '\\\?:[?]' '\\\*:[*]' '\\\$:[$]'
+	elif [ "${2%%\\*}" ]; then # bosh = all (>= 20181007), busybox <= 1.22.0
+		set -- '\\\\:\\\\\\\\' '\[:[[]' '\?:[?]' '\*:[*]' '\$:[$]'
+	else # POSIX compliant
+		set -- '\\:\\\\' '\[:[[]' '\?:[?]' '\*:[*]' '\$:[$]'
+	fi
+
+	set "$@" '\(:\\(' '\):\\)' '\|:\\|' '\":\\\"' '\`:\\\`' \
+		'\{:\\{' '\}:\\}' "\\':\\\\'" '\&:\\&' '\=:\\=' '\>:\\>' "end"
+
+	echo 'meta_escape() { set -- "$1" "$2" ""'
+	until [ "$1" = "end" ] && shift && printf '%s\n' "$@"; do
+		set -- "${1%:*}" "${1#*:}" "$@"
+		set -- "$@" 'until [ _"$2" = _"${2#*'"$1"'}" ] && set -- "$1" "$3$2" ""; do'
+		set -- "$@" '  set -- "$1" "${2#*'"$1"'}" "$3${2%%'"$1"'*}'"$2"'"'
+		set -- "$@" 'done'
+		shift 3
+	done
+	echo 'eval "$1=\"\$3\$2\""; }'
+}
+eval "$(meta_escape "a?" '\')"
+
+replace_all() {
+	(eval 'v="*#*/" p="#*/"; [ "${v//"$p"/-}" = "*-" ]') 2>/dev/null && return 0
+	[ "${1#"$2"}" = "a*b" ] && return 1 || return 2
+}
+eval 'replace_all "a*b" "a[*]" &&:' && :
+case $? in
+0) # Fast version (Not POSIX compliant)
+	replace_all() { replace_all_fast "$@"; } ;;
+1) # POSIX version (POSIX compliant)
+	replace_all() { replace_all_posix "$@"; } ;;
+2) # Pattern version
+	replace_all() {
+		meta_escape "$1" "$3"
+		eval "replace_all_pattern \"\$1\" \"\$2\" \"\${$1}\" \"\$4\""
+	} ;;
+esac
+
+replace_multiple() {
+	eval "${1}=\"\${2}\""
+	eval "shift 2; set -- '${1}'" '${@+"${@}"}'
+
+	while [ 2 -le "${#}" ]; do
+		eval 'replace_all "${1}"' "\"\${${1}}\"" '"${2}" "${3-}"'
+
+		case "${#}" in
+		'2') set -- ;;
+		*) eval "shift 3; set -- '${1}'" '${@+"${@}"}' ;;
+		esac
+	done
+}
+
+
+html_escape() {
+	replace_multiple "${1}" "${2}" '&' '&amp;' '<' '&lt;' '>' '&gt;' "'" '&#39;' '"' '&quot;'
+}
+
+
+
+
+
+
+replace_all_fast() {
+	eval "$1=\${2//\"\$3\"/\"\$4\"}"
+}
+
+replace_all_posix() {
+	set -- "$1" "$2" "$3" "$4" ""
+	until [ _"$2" = _"${2#*"$3"}" ] && eval "$1=\$5\$2"; do
+		set -- "$1" "${2#*"$3"}" "$3" "$4" "$5${2%%"$3"*}$4"
+	done
+}
+
+replace_all_pattern() {
+	set -- "$1" "$2" "$3" "$4" ""
+	until eval "[ _\"\$2\" = _\"\${2#*$3}\" ] && $1=\$5\$2"; do
+		eval "set -- \"\$1\" \"\${2#*$3}\" \"\$3\" \"\$4\" \"\$5\${2%%$3*}\$4\""
+	done
+}
+
+meta_escape() {
+	if [ "${1#*\?}" ]; then # posh <= 0.5.4
+		set -- '\\\\:\\\\\\\\' '\\\[:[[]' '\\\?:[?]' '\\\*:[*]' '\\\$:[$]'
+	elif [ "${2%%\\*}" ]; then # bosh = all (>= 20181007), busybox <= 1.22.0
+		set -- '\\\\:\\\\\\\\' '\[:[[]' '\?:[?]' '\*:[*]' '\$:[$]'
+	else # POSIX compliant
+		set -- '\\:\\\\' '\[:[[]' '\?:[?]' '\*:[*]' '\$:[$]'
+	fi
+
+	set "$@" '\(:\\(' '\):\\)' '\|:\\|' '\":\\\"' '\`:\\\`' \
+		'\{:\\{' '\}:\\}' "\\':\\\\'" '\&:\\&' '\=:\\=' '\>:\\>' "end"
+
+	echo 'meta_escape() { set -- "$1" "$2" ""'
+	until [ "$1" = "end" ] && shift && printf '%s\n' "$@"; do
+		set -- "${1%:*}" "${1#*:}" "$@"
+		set -- "$@" 'until [ _"$2" = _"${2#*'"$1"'}" ] && set -- "$1" "$3$2" ""; do'
+		set -- "$@" '  set -- "$1" "${2#*'"$1"'}" "$3${2%%'"$1"'*}'"$2"'"'
+		set -- "$@" 'done'
+		shift 3
+	done
+	echo 'eval "$1=\"\$3\$2\""; }'
+}
+eval "$(meta_escape "a?" '\')"
+
+replace_all() {
+	(eval 'v="*#*/" p="#*/"; [ "${v//"$p"/-}" = "*-" ]') 2>/dev/null && return 0
+	[ "${1#"$2"}" = "a*b" ] && return 1 || return 2
+}
+eval 'replace_all "a*b" "a[*]" &&:' && :
+case $? in
+0) # Fast version (Not POSIX compliant)
+	replace_all() { replace_all_fast "$@"; } ;;
+1) # POSIX version (POSIX compliant)
+	replace_all() { replace_all_posix "$@"; } ;;
+2) # Pattern version
+	replace_all() {
+		meta_escape "$1" "$3"
+		eval "replace_all_pattern \"\$1\" \"\$2\" \"\${$1}\" \"\$4\""
+	} ;;
+esac
+
+replace_multiple() {
+	eval "${1}=\"\${2}\""
+	eval "shift 2; set -- '${1}'" '${@+"${@}"}'
+
+	while [ 2 -le "${#}" ]; do
+		eval 'replace_all "${1}"' "\"\${${1}}\"" '"${2}" "${3-}"'
+
+		case "${#}" in
+		'2') set -- ;;
+		*) eval "shift 3; set -- '${1}'" '${@+"${@}"}' ;;
+		esac
+	done
+}
+
+
+remove_control_character() {
+	set -- "${1}" "${2}" "${3}" "$(printf '\001\002\003\004\005\006\007\010\011\012\013\014\015\016\017\020\021\022\023\024\025\026\027\030\031\032\033\034\035\036\037\177\200\201\202\203\204\205\206\207\210\211\212\213\214')"
+
+	while [ -n "${3}" ]; do
+		replace_all "${1}" "${4}" "${3%%${3#?}}" ''
+
+		eval 'set -- "${1}" "${2}" "${3#?}"' "\"\${${1}}\""
+	done
+
+	set -- "${1}" "${2}" "${4}" ''
+
+	while [ -n "${3}" ]; do
+		set -- "${1}" "${2}" "${3#?}" "${4} '${3%%${3#?}}' ''"
+	done
+
+	eval 'replace_multiple "${1}" "${2}"' "${4}"
+}
+
+
+safe_string() {
+	remove_control_character "${1}" "${2}" "$(printf '\t\n\r')"
+}
+
+parser_definition() {
+	setup REST plus:true abbr:true error:option_error no:0 help:usage \
+		-- 'Usage:' "  QUERY_STRING='type={malware|phishing|spam}&source={url}&url={url}' ${2##*/}" \
+		'' 'Options:'
+
+	disp :usage -h --help -- 'このヘルプを表示して終了する'
+	disp VERSION -v --version -- 'バージョン情報を表示して終了する'
+
+	msg -- '' 'Exit Status:' \
+		'    0 - successful termination' \
+		'   64 - command line usage error' \
+		'   65 - data format error' \
+		'   66 - cannot open input' \
+		'   67 - addressee unknown' \
+		'   68 - host name unknown' \
+		'   69 - service unavailable' \
+		'   70 - internal software error' \
+		"   71 - system error (e.g., can't fork)" \
+		'   72 - critical OS file missing' \
+		"   73 - can't create (user) output file" \
+		'   74 - input/output error' \
+		'   75 - temp failure; user is invited to retry' \
+		'   76 - remote error in protocol' \
+		'   77 - permission denied' \
+		'   78 - configuration error' \
+		'  129 - received SIGHUP' \
+		'  130 - received SIGINT' \
+		'  131 - received SIGQUIT' \
+		'  143 - received SIGTERM'
+
+	msg -- '' 'Environment Variables:' \
+		'  W3MPLUS_HOME  - w3mplus の設定ファイルのディレクトリ' \
+		'  W3MPLUS_CACHE - w3mplus のキャッシュを保存するディレクトリ' \
+		'  W3MPLUS_PATH  - w3mplus の実行ファイルのディレクトリ' \
+		'  W3MPLUS_LIB   - w3mplus のライブラリファイルのディレクトリ'
+}
+
+REST=''
+parse() {
+	OPTIND=$(($# + 1))
+	while OPTARG= && [ $# -gt 0 ]; do
+		set -- "${1%%\=*}" "${1#*\=}" "$@"
+		while [ ${#1} -gt 2 ]; do
+			case $1 in *[!a-zA-Z0-9_-]*) break ;; esac
+			case '--help' in
+			"$1")
+				OPTARG=
+				break
+				;;
+			$1*) OPTARG="$OPTARG --help" ;;
+			esac
+			case '--version' in
+			"$1")
+				OPTARG=
+				break
+				;;
+			$1*) OPTARG="$OPTARG --version" ;;
+			esac
+			break
+		done
+		case ${OPTARG# } in
+		*\ *)
+			eval "set -- $OPTARG $1 $OPTARG"
+			OPTIND=$((($# + 1) / 2)) OPTARG=$1
+			shift
+			while [ $# -gt "$OPTIND" ]; do
+				OPTARG="$OPTARG, $1"
+				shift
+			done
+			set "Ambiguous option: $1 (could be $OPTARG)" ambiguous "$@"
+			option_error "$@" >&2 || exit $?
+			echo "$1" >&2
+			exit 1
+			;;
+		?*)
+			[ "$2" = "$3" ] || OPTARG="$OPTARG=$2"
+			shift 3
+			eval 'set -- "${OPTARG# }"' ${1+'"$@"'}
+			OPTARG=
+			;;
+		*) shift 2 ;;
+		esac
+		case $1 in
+		--?*=*)
+			OPTARG=$1
+			shift
+			eval 'set -- "${OPTARG%%\=*}" "${OPTARG#*\=}"' ${1+'"$@"'}
+			;;
+		--no-* | --without-*) unset OPTARG ;;
+		-[hv]?*)
+			OPTARG=$1
+			shift
+			eval 'set -- "${OPTARG%"${OPTARG#??}"}" -"${OPTARG#??}"' ${1+'"$@"'}
+			OPTARG=
+			;;
+		+*) unset OPTARG ;;
+		esac
+		case $1 in
+		'-h' | '--help')
+			usage
+			exit 0
+			;;
+		'-v' | '--version')
+			echo "${VERSION}"
+			exit 0
+			;;
+		--)
+			shift
+			while [ $# -gt 0 ]; do
+				REST="${REST} \"\${$((OPTIND - $#))}\""
+				shift
+			done
+			break
+			;;
+		[-+]?*)
+			set "unknown" "$1"
+			break
+			;;
+		*)
+			REST="${REST} \"\${$((OPTIND - $#))}\""
+			;;
+		esac
+		shift
+	done
+	[ $# -eq 0 ] && {
+		OPTIND=1
+		unset OPTARG
+		return 0
+	}
+	case $1 in
+	unknown) set "Unrecognized option: $2" "$@" ;;
+	noarg) set "Does not allow an argument: $2" "$@" ;;
+	required) set "Requires an argument: $2" "$@" ;;
+	pattern:*) set "Does not match the pattern (${1#*:}): $2" "$@" ;;
+	notcmd) set "Not a command: $2" "$@" ;;
+	*) set "Validation error ($1): $2" "$@" ;;
+	esac
+	option_error "$@" >&2 || exit $?
+	echo "$1" >&2
+	exit 1
+}
+usage() {
+	cat <<'GETOPTIONSHERE'
+Usage:
+  QUERY_STRING='type={malware|phishing|spam}&source={url}&url={url}' protectionpage
+
+Options:
+  -h,     --help              このヘルプを表示して終了する
+  -v,     --version           バージョン情報を表示して終了する
+
+Exit Status:
+    0 - successful termination
+   64 - command line usage error
+   65 - data format error
+   66 - cannot open input
+   67 - addressee unknown
+   68 - host name unknown
+   69 - service unavailable
+   70 - internal software error
+   71 - system error (e.g., can't fork)
+   72 - critical OS file missing
+   73 - can't create (user) output file
+   74 - input/output error
+   75 - temp failure; user is invited to retry
+   76 - remote error in protocol
+   77 - permission denied
+   78 - configuration error
+  129 - received SIGHUP
+  130 - received SIGINT
+  131 - received SIGQUIT
+  143 - received SIGTERM
+
+Environment Variables:
+  W3MPLUS_HOME  - w3mplus の設定ファイルのディレクトリ
+  W3MPLUS_CACHE - w3mplus のキャッシュを保存するディレクトリ
+  W3MPLUS_PATH  - w3mplus の実行ファイルのディレクトリ
+  W3MPLUS_LIB   - w3mplus のライブラリファイルのディレクトリ
+GETOPTIONSHERE
+}
+
+parse ${@+"${@}"}
+eval "set -- ${REST}"
+
+eval "$(org_lc parsequery --prefix 'query_' "${QUERY_STRING%%url=*}")"
+
+safe_string 'url' "${QUERY_STRING#*url=}"
+html_escape 'url' "${url}"
+
+safe_string 'source' "${query_source-}"
+html_escape 'source' "${source}"
+
+safe_string 'name' "${query_name-${query_source-}}"
+html_escape 'name' "${name}"
+
+case "${query_category-}" in
+'phishing')
+	title='Reported Web Forgery!'
+	message='
+			<p>Web forgeries are designed to trick you into revealing personal or financial information by imitating sources you may trust.</p>
+
+			<p>Entering any information on this web page may result in identity theft or other fraud.</p>
+		'
+	;;
+'malware')
+	title='Reported Attack Page!'
+	message='
+			<p>Attack pages try to install programs that steal private information, use your computer to attack others, or damage your system.</p>
+
+			<p>Some attack pages intentionally distribute harmful software, but many are compromised without the knowledge or permission of their owners.</p>
+		'
+	;;
+'unwanted-software')
+	title='Reported Unwanted Software Page!'
+	message='<p>Unwanted software pages try to install software that can be deceptive and affect your system in unexpected ways.</p>'
+	;;
+'ad')
+	title='Reported Advertisement Page!'
+	message=''
+	;;
+*)
+	title='Forbidden Site'
+	message=''
+	;;
+esac
+
+org_lc printhtml --title 'Forbidden Site' -- - <<-__EOF__ | org_lc httpresponse -H 'Content-Type: text/html; charset=UTF-8' -- -
+	<h1>${title}</h1>
+
+	<p>This Web page at <a href="${url}">${url}</a> has been blocked based on <a href="${source}">${name}</a></p>
+
+	${message}
+
+	<p>To access this web page, change <a href="about:permissions">about:permissions</a> settings.</p>
+__EOF__
