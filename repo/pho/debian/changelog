@@ -1,0 +1,79 @@
+pho (1.0pre1) unstable; urgency=low
+  * Add middlemouse dragging in presentation mode.
+  * Add keywords mode.
+  * Assorted stability, bug and documentation fixes.
+ -- Akkana Peck <akkana@shallowsky.com>  Sat, 9 Jul 2016 15:09:42 -0700
+
+pho (0.9.8) unstable; urgency=low
+  * Add -p resolution option, for use with projectors.
+  * -c now allows custom specification of caption/comment file.
+  * Contributions from david <somloieater@gmail.com> Sun, 8 Apr 2011 11:15:00 +0200
+ -- Akkana Peck <akkana@shallowsky.com>  Mon, 3 Sep 2012 19:27:00 -0800
+
+pho (0.9.7) unstable; urgency=low
+  * Add ability to add new image files or change the list without restarting.
+  * Reorganize some scaling options.
+  * More configurable PHO_CMD variable.
+  * Allow up to 31 notes flags.
+  * Swap meanings of f and F.
+  * Lots of code cleanup and reliability fixes.
+  * add .cap file support for captions - read into comment field
+    and saved on exit
+  * Contributions from david <somloieater@gmail.com> Sun, 8 Apr 2011 11:15:00 +0200
+ -- Akkana Peck <akkana@shallowsky.com>  Mon, 3 Sep 2012 19:27:00 -0800
+
+pho (0.9.6) unstable; urgency=low
+
+  * Add Keyword mode.
+  * Add slideshow mode.
+  * Swap -f and -F.
+  * Add PHO_CMD environment variable.
+  * Simplify exif/Makefile so it'll work on FreeBSD and other systems where make is non-GNU make.
+  * Change the list next/prev code to fix (I hope) a bug where pho would get confused and cycle from the last image back to the first.
+  * Lots of performance and stability work.
+
+ -- Akkana Peck <akkana@shallowsky.com>  Sun, 9 Nov 2008 16:20:00 -0800
+
+pho (0.9.5) unstable; urgency=low
+
+  * Code cleanup: rewrote the image list handling to use a linked list.
+  * Port to gtk2, and build under either gtk1 or gtk2.
+  * Add new "fullscreen mode" (e.g. for presentations, or for difficult
+    window managers).
+  * Add handling of PHO_ARGS environment variable
+  * Added a workaround for Metacity's evil window size handling.
+  * Lots of bug fixes.
+
+ -- Akkana Peck <akkana@shallowsky.com>  Mon, 20 Mar 2007 21:25:00 -0800
+
+pho (0.9.2) unstable; urgency=low
+
+  * Don't try to move the window unless the image size has changed
+    (fix the annoying bug where pho wouldn't let you move windows).
+  * Fix a crash after dismissing the info dialog by clicking
+    on the windowmanager "X".
+
+ -- Akkana Peck <akkana@shallowsky.com>  Tue, 30 Sep 2003 23:24:01 -0800
+
+pho (0.9.1) unstable; urgency=low
+
+  * Rusty Russell: fix an off-by-one error in rotation code,
+    eliminating the need to allocate more memory than needed.
+  * Brian Langenberger: bracket printed filenames with quotes if
+    they contain spaces or quote characters.
+
+ -- Akkana Peck <akkana@shallowsky.com>  Wed, 26 Feb 2003 23:24:01 -0800
+
+pho (0.9) unstable; urgency=low
+
+  * Add EXIF handling, using code from jhead.
+  * Fix some build errors, and release 0.9.
+
+ -- Akkana Peck <akkana@shallowsky.com>  Wed,  8 Jan 2002 23:24:01 -0800
+
+pho (0.8-1) unstable; urgency=low
+
+  * Initial Debian Release.
+
+ -- Akkana Peck <akkana@shallowsky.com>  Tue,  15 Oct 2002 21:49:27 -0700
+

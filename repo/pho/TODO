@@ -1,0 +1,69 @@
+Ideas for improving pho (in no particular order).
+If you have more ideas, or want to contribute to the project,
+let me know!
+
+BUGS:
+
+- "Error scaling up to 682788 x 512216: probably out of memory"
+  leaves pho in a state where it can't do anything else.
+  To reproduce: run in keywords mode and use = key.
+  Bad state is fixed; but why do we have an error scaling?
+  Okay, we understand that now, but it leaves a question:
+  what is the actual difference between PHO_SCALE_FIXED and
+  PHO_SCALE_SCREEN_RATIO ?
+
+- dismissing dialog on last image doesn't redraw covered area:
+  how to reproduce?
+
+- EXIF rotation problems (mostly fixed, may still be a few edge cases)
+
+- Going from presentation mode to non-presentation mode,
+  we don't get an expose so we don't get a chance to check the
+  frame size and adjust window size accordingly. (fixed?)
+
+- Calling DrawImage too many times. (much improved, still not perfect)
+
+
+- Show cursor in text fields in keywords dialog (gtk bug, probably can't fix)
+
+Regression tests:
+- make sure keywords on current image get saved when you quit.
+
+- Info dialog still doesn't init first time (maybe fixed? but find out why)
+
+- with exif rotation, ScaleImage in pho.c is passed inverted monitor sizes
+  (width passed as height and vice versa)
+  so the keywords mode check doesn't work right. Ick!
+  Wouldn't it be better to rotate the image first? Oh, but it's better
+  to scale down before rotating (for performance).
+  (I think I fixed this.)
+
+
+FUTURE FEATURE WORK:
+
+- crop with jpegtran
+
+- Parse and write Keywords file
+
+- Change set of working images
+  - Question: what does pho print out at the end?
+    Everything from the session, probably;
+    but with full pathnames, or directory separators then single filenames?
+
+Other ideas for possible future work:
+
+Should be relatively easy:
+
+- ? brings up a help screen.
+
+- print out commands to do the rotation via ImageMagick.
+
+Slightly harder:
+
+- Save notes to EXIF.
+
+- Save images at the proper rotation, preserving EXIF.
+
+- Use libexif
+
+

@@ -1,0 +1,7 @@
+*.o
+*.a
+pho
+tags
+build-stamp
+configure-stamp
+pho.debhelper.log
