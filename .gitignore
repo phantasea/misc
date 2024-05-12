@@ -6,14 +6,12 @@ apps/cmdfu/build
 apps/cmdfu/dist
 apps/cmdfu/fu.egg-info
 
-fonts/.uuid
-dicts/stardict-21shijishuangxiangcidian-big5-2.4.2/21shijishuangxiangcidian-big5.idx.oft
-dicts/stardict-21shijishuangyukejicidian-big5-2.4.2/21shijishuangyukejicidian-big5.idx.oft
-dicts/stardict-langdao-ce-big5-2.4.2/langdao-ce-big5.idx.oft
-dicts/stardict-langdao-ec-big5-2.4.2/langdao-ec-big5.idx.oft
-dicts/stardict-langdao-ec-gb-2.4.2/langdao-ec-gb.idx.oft
-dicts/stardict-oxford-big5-2.4.2/oxford-big5.idx.oft
-dicts/stardict-xdict-ce-big5_fix-2.4.2/xdict-ce-big5.idx.oft
-dicts/stardict-xdict-ec-big5_fix-2.4.2/xdict-ec-big5.idx.oft
-
-
+font/.uuid
+dict/stardict-21shijishuangxiangcidian-big5-2.4.2/21shijishuangxiangcidian-big5.idx.oft
+dict/stardict-21shijishuangyukejicidian-big5-2.4.2/21shijishuangyukejicidian-big5.idx.oft
+dict/stardict-langdao-ce-big5-2.4.2/langdao-ce-big5.idx.oft
+dict/stardict-langdao-ec-big5-2.4.2/langdao-ec-big5.idx.oft
+dict/stardict-langdao-ec-gb-2.4.2/langdao-ec-gb.idx.oft
+dict/stardict-oxford-big5-2.4.2/oxford-big5.idx.oft
+dict/stardict-xdict-ce-big5_fix-2.4.2/xdict-ce-big5.idx.oft
+dict/stardict-xdict-ec-big5_fix-2.4.2/xdict-ec-big5.idx.oft
