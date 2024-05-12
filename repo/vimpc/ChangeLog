@@ -1,0 +1,156 @@
+Version 0.09.2
+-------------
+
+- Fix lyrics fetching
+- Allow XDG base configuration folder (https://github.com/boysetsfrog/vimpc/issues/56)
+- Fix down wheel scroll with newer ncurses versions (https://github.com/boysetsfrog/vimpc/pull/77)
+- Trigger autoscroll every time the current song is updated (https://github.com/boysetsfrog/vimpc/pull/79)
+- Link against tinfow or tinfo if needed (https://github.com/boysetsfrog/vimpc/issues/80)
+- Fix integer overflow with negative scrolling (https://github.com/boysetsfrog/vimpc/pull/78)
+- Make scroll to random line non-deterministic (https://github.com/boysetsfrog/vimpc/pull/75)
+- Adding support for a $Axx token in the songformat that allows to have the following text aligned to xx percent of the screen. (https://github.com/boysetsfrog/vimpc/pull/71)
+- Update shortcut and description for `toggle pause` (https://github.com/boysetsfrog/vimpc/pull/72)
+- Exit search when no input given (https://github.com/boysetsfrog/vimpc/issues/53)
+- Include disk numbers (https://github.com/boysetsfrog/vimpc/issues/38)
+- Add date to format options (https://github.com/boysetsfrog/vimpc/issues/46)
+- Default markers are now a-z (https://github.com/boysetsfrog/vimpc/issues/43)
+- Playlist editing with cut/paste (https://github.com/boysetsfrog/vimpc/issues/36)
+
+Version 0.09.1
+-------------
+
+- Honor sortignorecase and sortignorethe settings in browse window when using sort set to format
+- Fix crash on move with invalid parameters
+- Ensure move positions work correctly at the edge cases
+- Fixed broken pasting of songs into playlist with 'P'
+- Basic and initial support for embedded cue sheets
+- Made specifying of mappings case insensitive
+- Add :localadd command to add files when using filesystem socket
+- Show URI in status bar if song title is unknown
+- Add bindings zo and zc to open and close library expansions
+- Fix bug where outputs window was not painted correctly when first opened
+- Added <sc> to be used to map ';' to another key
+
+
+Version 0.09.0
+-------------
+- Add 'albumartist' setting to use AlbumArtist instead of Artist
+- Add tab completion for :add command
+- Add progress/seek bar
+- Add 'gm' to move a song to a given position
+- Add :mute command
+- Add :unalias command
+- Add :substitute (:s) command for basic tag editting
+- Add support for ranges on some ex mode commands
+- Add ability to map keys to <Nop>
+- UTF8 support in exmode and searching
+- Threaded client access and keyboard input
+- Add optional support for boost instead of C++11 libraries
+- Reduced requirement on pcrecpp to just pcre instead
+- Support for lists with older libmpdclient versions
+- Bug Fix: connecting to host with password on all commands failed badly
+- Bug Fix: windows were limited to 65535 lines
+- Performance improvements
+
+Version 0.08.1
+-------------
+- Fixed bounds check crashes on some empty window key presses
+- Fixed crashes when using larger counts in normal mode
+- Fix invalid iterator accesses
+
+Version 0.08
+-------------
+- Support for :highlight color changing commands
+- Tab specific key mappings with tmap
+- Allow mapping of basic mouse input
+- Window selection tab
+
+Version 0.07.2
+-------------
+- Bug Fix: fix issue when scrolling from last line
+
+Version 0.07.1
+-------------
+- Bug Fix: fixed crash when using 'A' and 'D' on lists window
+- Bug Fix: fixed scroll to crashes on empty windows
+- Bug Fix: go to large line number using :<number> fix
+- Bug Fix: go to mark on closed window opens the window
+
+Version 0.07
+-------------
+- Added directory window (:directory)
+- Added pager window to view current settings/maps (:set or :map)
+- Added :set <setting>? to view current setting
+- Added numerous settings, eg, scrollonadd, playonadd, timeout.
+- Added <Ctrl+e>, <Ctrl+b>, <Ctrl+u> shortcuts when editting commands
+- Added tab completion for loading playlists :load <Tab>
+- Added updaing indication
+_ Added '%' to goto a random line
+- Added commands :update, :rescan, :addall, :normal
+- Fixed a number of crashes
+
+Version 0.06.1
+-------------
+- Bug Fix: using enter on library window when in visual mode now works
+- Bug Fix: fixed broken adding of albums, etc from library window
+- Bug Fix: fixed collapsing of album/artists on library window
+
+Version 0.06
+-------------
+- printf style formatting of song prints
+- Support for mpd idle mode
+- Reduced network traffic when in "polling" mode
+- Added "Various Artist" to library to hold albums with more than one artist
+- Vim style mark support, with default marks for A-Z locations
+- More efficient use of command lists to speed up add/delete commands
+- Turned on mouse support by default
+- Automatic redrawing of windows when settings are changed
+- Added 'incsearch' setting to search as you type
+- Added 'add' setting to add songs either 'next' or at the 'end'
+- Added support for :1 :2 etc, to jump to a given line
+- gV to reselect previously selected selection
+- Added findgenre command
+- Minor performance improvements
+
+Version 0.05
+-------------
+- Support for http streams in playlist
+- Ability to map keys using :map command
+- Case insensitive sorting of windows
+- Password support
+
+Version 0.04
+--------------
+- Added find, findsong, findalbum, findartist commands
+- Added outputs and lists windows
+- Added songinfo window
+- Added seeking support
+- New settings timeremaining, ignorecase, smartcase, singlequit
+- Using proper queue update based on changes
+- Lots of network efficiency improvements
+
+Version 0.03
+---------------
+- Added volume, random, consume, repeat and single states to display
+- Cleaned up library interface, now much easier to read
+- Sped up the library colour determination
+- Added nocolour option to disable colours
+- Added expand-artists option to show artist level in library by default
+- Lots of crashing bug fixes
+
+
+Version 0.02.1
+---------------- 
+- Added browse window similar to playlist but that contains all songs and can be used to add to playlist
+- Improved adding and delete commands and colour highlighting 
+- Fixed so that it does not require config file
+- Lots of bug fixes 
+
+Version 0.01
+---------------- 
+- First release of vimpc 
+- Still requires a lot of improved functionality and work 
+- Supports playing of music from playlist or library 
+- Basic modifications of the playlist via the library window 
+- In program help by typing :help command 
+- Has many bugs 
