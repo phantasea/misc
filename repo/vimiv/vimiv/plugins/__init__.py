@@ -1,0 +1,196 @@
+# vim: ft=python fileencoding=utf-8 sw=4 et sts=4
+
+"""`Interface to load and initialize plugins`.
+
+Plugins are python modules that are either in ``vimiv/plugins/`` (app plugins) or
+``$XDG_DATA_HOME/vimiv/plugins/`` (user plugins). A possible path is to write a plugin
+in its own git repository and let the user to clone that repository into
+``$XDG_DATA_HOME/vimiv/plugins/``. It can then be activated in the configuration file.
+A simple example to get an idea of the plugin structure is realized in the demo plugin
+``vimiv/plugins/demo.py``.
+
+There are three main components a plugin can make use of to interact with vimiv:
+
+* The application api imported via ``from vimiv import api``
+* The ``init`` function of the plugin which gets called as soon as the plugin is
+  loaded. It receives the information string as first argument which contains the
+  additional information supplied by the user in the configuration file after the plugin
+  name. This can be used to receive simple information from the user.
+* The ``cleanup`` function of the plugin which gets called when the vimiv application
+  exits.
+
+.. hint::
+
+    It is considered good practice to add ``*args, **kwargs`` to the ``init`` and
+    ``cleanup`` function of any plugin. This allows additional information to be passed
+    via these functions at any time without breaking the plugin.
+
+.. note::
+
+    Using any other imports from vimiv besides the api module is not considered stable
+    and may break at any point without warning. If you require functionality that is not
+    within the api, please open an issue to discuss this. This helps the api grow and
+    keeps plugins stable.
+
+.. warning::
+
+    Before the release of version 1.0 there may be changes to the api although it is
+    tried to keep them as minimal as possible. Any breaking changes will be announced
+    in advance to allow plugins to adapt.
+
+The plugin loading process can be summarized by the following steps:
+
+#. The 'PLUGINS' section of the configuration file is iterated over. Keys defined are
+   the names of the plugins that should be loaded later, values can be arbitrary
+   additional information.
+#. After setting up the main application, the defined plugins are loaded by the
+   :func:`load` function. During loading the ``init`` function of the plugin is called.
+#. Before the application is quit, the ``cleanup`` function of all loaded plugins is
+   called.
+
+----------------------------------------------------------------------------------------
+
+Module Attributes:
+    _app_plugin_directory: Directory in which plugins shipped with vimiv are located.
+    _user_plugin_directory: Directory in which user-installed plugins are located.
+    _plugins: Dictionary mapping plugin names to additional information as defined in
+        the configuration file.
+    _loaded_plugins: Dictionary mapping loaded plugin names to the loaded python module.
+"""
+
+import importlib
+import os
+import sys
+import types
+from typing import Dict, List
+
+from vimiv.utils import xdg, log, quotedjoin
+from vimiv import api
+
+
+_app_plugin_directory = os.path.dirname(__file__)
+_user_plugin_directory = xdg.vimiv_data_dir("plugins")
+_plugins: Dict[str, str] = {
+    "print": "default",
+    "metadata": "default",
+}  # key: name, value: additional information
+_loaded_plugins: Dict[str, types.ModuleType] = {}  # key:name, value: loaded module
+_logger = log.module_logger(__name__)
+
+
+def load() -> None:
+    """Load plugins defined.
+
+    If no plugins are passed to the function all active plugins are loaded.
+
+    Args:
+        plugins: Plugin names to load.
+    """
+    _logger.debug("Loading plugins...")
+    sys.path.insert(0, _app_plugin_directory)
+    sys.path.insert(0, _user_plugin_directory)
+    app_plugins = _get_plugins(_app_plugin_directory)
+    _logger.debug("Available app plugins: %s", quotedjoin(app_plugins))
+    user_plugins = _get_plugins(_user_plugin_directory)
+    _logger.debug("Available user plugins: %s", quotedjoin(user_plugins))
+    for plugin, info in _plugins.items():
+        if plugin in app_plugins:
+            _load_plugin(plugin, info, _app_plugin_directory)
+        elif plugin in user_plugins:
+            _load_plugin(plugin, info, _user_plugin_directory)
+        else:
+            _logger.error(
+                "Unable to find plugin '%s', ignoring.\n"
+                "    Available app plugins: %s\n"
+                "    Available user plugins: %s\n"
+                "    User plugin directory: '%s'",
+                plugin,
+                quotedjoin(app_plugins),
+                quotedjoin(user_plugins),
+                _user_plugin_directory,
+            )
+    _logger.debug("Plugin loading completed")
+    api.signals.plugins_loaded.emit()
+
+
+def cleanup() -> None:
+    """Clean up all loaded plugins.
+
+    This calls the cleanup function for all loaded plugins and is called before vimiv is
+    closed.
+    """
+    _logger.debug("Cleaning up plugins")
+    for name, module in _loaded_plugins.items():
+        try:
+            module.cleanup()
+            _logger.debug("Cleaned up '%s'", name)
+        except AttributeError:
+            _logger.debug("Plugin '%s' does not define cleanup()", name)
+
+
+def add_plugins(**plugins: str) -> None:
+    """Add plugins to the dictionary of plugins.
+
+    Note that the plugins are prepended, and take precedence above the existing plugins.
+
+    Args:
+        plugins: Dictionary of plugin names with metadata to add to plugins.
+    """
+    global _plugins
+
+    for plugin, info in _plugins.items():
+        if plugin not in plugins:
+            plugins[plugin] = info
+
+    _plugins = plugins
+
+
+def get_plugins() -> Dict[str, str]:
+    """Retrieve dictionary containing active plugin names and additional information."""
+    return dict(_plugins)
+
+
+def _load_plugin(name: str, info: str, directory: str) -> None:
+    """Load a single plugin.
+
+    Args:
+        name: Name of the plugin as python module.
+        info: Additional information string passed to the plugin's init.
+        directory: Directory in which the python module is located.
+    """
+    _logger.debug("Loading plugin '%s' from '%s'", name, directory)
+    try:
+        module = importlib.import_module(name, directory)
+    except (ImportError, SyntaxError) as e:
+        log.error("Importing plugin '%s': %s", name, str(e))
+        return
+    try:
+        module.init(info)
+        _logger.debug("Initialized '%s'", name)
+    except AttributeError:
+        _logger.debug("Plugin '%s' does not define init()", name)
+    _logger.debug("Loaded '%s' successfully", name)
+    _loaded_plugins[name] = module
+
+
+def _get_plugins(directory: str) -> List[str]:
+    """Retrieve all plugin names inside a directory."""
+    try:
+        return sorted(
+            path.replace(".py", "")
+            for path in os.listdir(directory)
+            if _is_plugin(os.path.join(directory, path))
+        )
+    except FileNotFoundError:
+        return []
+
+
+def _is_plugin(path: str) -> bool:
+    """Check if a path is a possible plugin."""
+    if os.path.isfile(path):
+        is_python_module = path.endswith(".py")
+        is_hidden = os.path.basename(path).startswith("_")
+        return is_python_module and not is_hidden
+    if os.path.isdir(path):
+        return "__init__.py" in os.listdir(path)
+    return False

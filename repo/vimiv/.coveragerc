@@ -1,0 +1,12 @@
+[run]
+omit = *__main__.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    coverage: ignore
+    raise NotImplementedError
+    if __name__ == "__main__"
+    @utils.asyncfunc
+    @asyncfunc
+    def __repr__

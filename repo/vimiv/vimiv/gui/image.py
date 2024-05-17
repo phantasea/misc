@@ -1,0 +1,444 @@
+# vim: ft=python fileencoding=utf-8 sw=4 et sts=4
+
+"""QtWidgets for IMAGE mode."""
+
+import contextlib
+from typing import List, Union, Optional, Callable
+
+from vimiv.qt.core import Qt, QRectF, Signal
+from vimiv.qt.widgets import (
+    QGraphicsView,
+    QGraphicsScene,
+    QFrame,
+    QGraphicsItem,
+    QGraphicsPixmapItem,
+    QLabel,
+)
+from vimiv.qt.gui import QMovie, QPixmap
+from vimiv.qt.svg import QtSvg
+
+from vimiv import api, imutils, utils
+from vimiv.imutils import slideshow
+from vimiv.commands.argtypes import (
+    Direction,
+    ImageScale,
+    ImageScaleFloat,
+    Zoom,
+    AspectRatio,
+)
+from vimiv.config import styles
+from vimiv.gui import eventhandler
+from vimiv.utils import log
+
+
+INF = float("inf")
+
+_logger = log.module_logger(__name__)
+
+
+class ScrollableImage(eventhandler.EventHandlerMixin, QGraphicsView):
+    # pylint: disable=too-many-public-methods
+    # TODO consider refactoring
+    """QGraphicsView to display Image or Animation.
+
+    Connects to the *_loaded signals to create the appropriate child widget.
+    Commands used in image mode are defined here.
+
+    Class Attributes:
+        MIN_SCALE: Minimum scale to scale an image to.
+        MAX_SCALE: Maximum scale to scale an image to.
+
+    Attributes:
+        transformation_module: Function returning additional information on current
+            more complex transformation such as straighten if any.
+
+        _scale: ImageScale defining how to scale image on resize.
+
+    Signals:
+        resized: Emitted after every resizeEvent.
+    """
+
+    STYLESHEET = """
+    QGraphicsView {
+        background-color: {image.bg};
+        border: none;
+    }
+    """
+
+    resized = Signal()
+
+    MAX_SCALE = 8
+    MIN_SCALE = 1 / 8
+
+    @api.modes.widget(api.modes.IMAGE)
+    @api.objreg.register
+    def __init__(self) -> None:
+        super().__init__()
+        styles.apply(self)
+
+        self._scale = ImageScaleFloat(1.0)
+        self.transformation_module: Optional[Callable[[], str]] = None
+
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setFrameShape(QFrame.Shape.Box)
+        scene = QGraphicsScene()
+        scene.setSceneRect(QRectF(0, 0, 1, 1))
+        self.setScene(scene)
+        self.setOptimizationFlags(QGraphicsView.OptimizationFlag.DontSavePainterState)
+
+        api.signals.pixmap_loaded.connect(self._load_pixmap)
+        api.signals.movie_loaded.connect(self._load_movie)
+        if QtSvg is not None:
+            api.signals.svg_loaded.connect(self._load_svg)
+        api.signals.all_images_cleared.connect(self._on_images_cleared)
+
+    @staticmethod
+    def current() -> str:
+        """Current path for image mode."""
+        return imutils.current()
+
+    @staticmethod
+    def pathlist() -> List[str]:
+        """List of current paths for image mode."""
+        return imutils.pathlist()
+
+    @property
+    def focalpoint(self):
+        """The center of the currently visible part of the scene."""
+        return self.visible_rect.center()
+
+    @property
+    def visible_rect(self):
+        """The currently visible part of the scene in the image coordinates."""
+        return self.mapToScene(self.viewport().rect()).boundingRect() & self.sceneRect()
+
+    def _load_pixmap(self, pixmap: QPixmap, keep_zoom: bool) -> None:
+        """Load new pixmap into the graphics scene."""
+        item = QGraphicsPixmapItem()
+        item.setPixmap(pixmap)
+        item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
+        self._update_scene(item, item.boundingRect(), keep_zoom)
+
+    def _load_movie(self, movie: QMovie, keep_zoom: bool) -> None:
+        """Load new movie into the graphics scene."""
+        movie.jumpToFrame(0)
+        if api.settings.image.autoplay.value:
+            movie.start()
+        widget = QLabel()
+        widget.setMovie(movie)
+        self._update_scene(widget, QRectF(movie.currentPixmap().rect()), keep_zoom)
+        widget.resize(movie.currentPixmap().size())
+
+    def _load_svg(self, path: str, keep_zoom: bool) -> None:
+        """Load new vector graphic into the graphics scene."""
+        item = QtSvg.QGraphicsSvgItem(path)
+        self._update_scene(item, item.boundingRect(), keep_zoom)
+
+    def _update_scene(
+        self, item: Union[QGraphicsItem, QLabel], rect: QRectF, keep_zoom: bool
+    ) -> None:
+        """Update the scene with the newly loaded item."""
+        self.scene().clear()
+        if isinstance(item, QGraphicsItem):
+            self.scene().addItem(item)
+        else:
+            self.scene().addWidget(item)
+        self.scene().setSceneRect(rect)
+        self.scale(self._scale if keep_zoom else ImageScale.Overzoom)  # type: ignore
+        self._update_focalpoint()
+
+    def _update_focalpoint(self):
+        self.centerOn(self.focalpoint)
+
+    def _on_images_cleared(self) -> None:
+        self.scene().clear()
+
+    @api.keybindings.register("k", "scroll up", mode=api.modes.IMAGE)
+    @api.keybindings.register("j", "scroll down", mode=api.modes.IMAGE)
+    @api.keybindings.register("l", "scroll right", mode=api.modes.IMAGE)
+    @api.keybindings.register("h", "scroll left", mode=api.modes.IMAGE)
+    @api.commands.register(mode=api.modes.IMAGE)
+    def scroll(self, direction: Direction, count: int = 1):  # type: ignore[override]
+        """Scroll the image in the given direction.
+
+        **syntax:** ``:scroll direction``
+
+        positional arguments:
+            * ``direction``: The direction to scroll in (left/right/up/down).
+
+        **count:** multiplier
+        """
+        if direction in (direction.Left, direction.Right):
+            bar = self.horizontalScrollBar()
+            step = int(self.scene().sceneRect().width() * 0.05 * count)
+        else:
+            bar = self.verticalScrollBar()
+            step = int(self.scene().sceneRect().height() * 0.05 * count)
+        if direction in (direction.Right, direction.Down):
+            bar.setValue(bar.value() + step)
+        else:
+            bar.setValue(bar.value() - step)
+
+    @api.keybindings.register("M", "center", mode=api.modes.IMAGE)
+    @api.commands.register(mode=api.modes.IMAGE)
+    def center(self):
+        """Center the image in the viewport."""
+        self.centerOn(self.sceneRect().center())
+
+    @api.keybindings.register("K", "scroll-edge up", mode=api.modes.IMAGE)
+    @api.keybindings.register("J", "scroll-edge down", mode=api.modes.IMAGE)
+    @api.keybindings.register("L", "scroll-edge right", mode=api.modes.IMAGE)
+    @api.keybindings.register("H", "scroll-edge left", mode=api.modes.IMAGE)
+    @api.commands.register(mode=api.modes.IMAGE)
+    def scroll_edge(self, direction: Direction):
+        """Scroll the image to one edge.
+
+        **syntax:** ``:scroll-edge direction``.
+
+        positional arguments:
+            * ``direction``: The direction to scroll in (left/right/up/down).
+        """
+        if direction in (Direction.Left, Direction.Right):
+            bar = self.horizontalScrollBar()
+        else:
+            bar = self.verticalScrollBar()
+        value = 0 if direction in (Direction.Left, Direction.Up) else bar.maximum()
+        bar.setValue(value)
+
+    @api.keybindings.register("-", "zoom out", mode=api.modes.IMAGE)
+    @api.keybindings.register("+", "zoom in", mode=api.modes.IMAGE)
+    @api.commands.register(mode=api.modes.IMAGE)
+    def zoom(self, direction: Zoom, count: int = 1):
+        """Zoom the current widget.
+
+        **syntax:** ``:zoom direction``
+
+        positional arguments:
+            * ``direction``: The direction to zoom in (in/out).
+
+        **count:** multiplier
+        """
+        scale = 1.25**count if direction == Zoom.In else 1 / 1.25**count
+        self._scale_to_float(self.zoom_level * scale)
+        self._scale = ImageScaleFloat(self.zoom_level)
+
+    @api.keybindings.register(
+        ("w", "<equal>"), "scale --level=fit", mode=api.modes.IMAGE
+    )
+    @api.keybindings.register("W", "scale --level=1", mode=api.modes.IMAGE)
+    @api.keybindings.register("e", "scale --level=fit-width", mode=api.modes.IMAGE)
+    @api.keybindings.register("E", "scale --level=fit-height", mode=api.modes.IMAGE)
+    @api.commands.register()
+    def scale(  # type: ignore[override]
+        self, level: ImageScaleFloat = ImageScaleFloat(1), count: int = 1
+    ):
+        """Scale the image.
+
+        **syntax:** ``:scale [--level=LEVEL]``
+
+        **count:** If level is a float, multiply by count.
+
+        optional arguments:
+            * ``--level``: The level to scale the image to.
+
+        .. hint:: supported levels:
+
+            * **fit**: Fit image to current viewport.
+            * **fit-width**: Fit image width to current viewport.
+            * **fit-height**: Fit image height to current viewport.
+            * **overzoom**: Like **fit** but limit to the overzoom setting.
+            * **float**: Set scale to arbitrary decimal value.
+        """
+        rect = self.scene().sceneRect()
+        if level == ImageScale.Overzoom:
+            self._scale_to_fit(
+                rect.width(), rect.height(), limit=api.settings.image.overzoom.value
+            )
+        elif level == ImageScale.Fit:
+            self._scale_to_fit(rect.width(), rect.height())
+        elif level == ImageScale.FitWidth:
+            self._scale_to_fit(width=rect.width())
+        elif level == ImageScale.FitHeight:
+            self._scale_to_fit(height=rect.height())
+        elif isinstance(level, float):
+            level *= count  # type: ignore  # Required so it is stored correctly later
+            self._scale_to_float(level)
+        self._scale = level
+
+    def _scale_to_fit(
+        self, width: float = None, height: float = None, limit: float = INF
+    ):
+        """Scale image so it fits the widget size.
+
+        The function is used to fit the image completely or only according to one of the
+        dimensions if either width or height remain None.
+
+        Args:
+            width: Width of the image to consider if any.
+            height: Height of the image to consider if any.
+            limit: Largest scale to apply trying to fit the widget size.
+        """
+        if self.scene() is None:
+            return
+        xratio = self.viewport().width() / width if width is not None else INF
+        yratio = self.viewport().height() / height if height is not None else INF
+        ratio = min(xratio, yratio, limit)
+        self._scale_to_float(ratio)
+
+    def _scale_to_float(self, level: float) -> None:
+        """Scale image to a defined size.
+
+        Args:
+            level: Size to scale to. 1 is the original image size.
+        """
+        level = utils.clamp(level, self.MIN_SCALE, self.MAX_SCALE)
+        factor = level / self.zoom_level
+        super().scale(factor, factor)
+        if factor < 1:
+            self._update_focalpoint()
+
+    @property
+    def zoom_level(self) -> float:
+        """Retrieve the current zoom level. 1 is the original image size."""
+        return self.transform().m11()
+
+    @api.status.module("{zoomlevel}")
+    def _get_zoom_level(self) -> str:
+        """Zoom level of the image in percent."""
+        return f"{self.zoom_level * 100:2.0f}%"
+
+    @api.status.module("{image-size}")
+    def _get_image_size(self):
+        """Size of the image in pixels in the form WIDTHxHEIGHT."""
+        rect = self.scene().sceneRect()
+        return f"{rect.width():.0f}x{rect.height():.0f}"
+
+    @api.keybindings.register("<space>", "play-or-pause", mode=api.modes.IMAGE)
+    @api.commands.register(mode=api.modes.IMAGE)
+    def play_or_pause(self):
+        """Toggle between play and pause of animation."""
+        with contextlib.suppress(IndexError, AttributeError):  # No items, not a movie
+            widget = self.items()[0].widget()
+            movie = widget.movie()
+            movie.setPaused(not movie.state() == QMovie.MovieState.Paused)
+
+    @api.commands.register(mode=api.modes.IMAGE, edit=True)
+    def straighten(self):
+        """Display a grid to straighten the current image.
+
+        The image can then be straightened clockwise using the ``l``, ``>`` and ``L``
+        keys and counter-clockwise with ``h``, ``<`` and ``H``. Accept the changes with
+        ``<return>`` and reject them with ``<escape>``.
+        """
+        from vimiv.gui.straightenwidget import StraightenWidget
+
+        StraightenWidget(self)
+
+    @api.commands.register(mode=api.modes.IMAGE)
+    def crop(self, aspectratio: AspectRatio = None):
+        """Display a widget to crop the current image.
+
+        **syntax:** ``crop [--aspectratio=ASPECTRATIO]``
+
+        optional arguments:
+            * ``--aspectratio``: Fix the cropping to the given aspectratio. Valid
+              options are two integers separated by ``:`` or the special ``keep`` to
+              keep the aspectratio of the current image.
+        """
+        from .crop_widget import CropWidget
+
+        self.scale(level=ImageScale.Fit)  # type: ignore
+        if aspectratio is not None and aspectratio.keep:
+            aspectratio.setWidth(int(self.sceneRect().width()))
+            aspectratio.setHeight(int(self.sceneRect().height()))
+        CropWidget(self, aspectratio=aspectratio)
+
+    @api.status.module("{transformation-info}")
+    def transformation_info(self) -> str:
+        """Additional information on image transformations such as straightening."""
+        if self.transformation_module is None:
+            return ""
+        return self.transformation_module()  # pylint: disable=not-callable
+
+    @api.status.module("{cursor-position}")
+    def cursor_position(self) -> str:
+        """Current cursor position in image coordinates."""
+        # Initialize mouse tracking on first call
+        if not self.hasMouseTracking():
+            _logger.debug("Activating mouse tracking for {cursor-position} module")
+            self.setMouseTracking(True)
+            # We only want to override leaveEvent if we really have to
+            # pylint: disable=invalid-name
+            self.leaveEvent = self._leave_event  # type: ignore[method-assign]
+
+        rect = self.sceneRect().toRect()
+        if rect.width() == 1:  # Empty
+            return ""
+
+        cursor_pos = self.mapToScene(self.mapFromGlobal(self.cursor().pos())).toPoint()
+
+        if not 0 < cursor_pos.x() <= rect.width():
+            return ""
+        if not 0 < cursor_pos.y() <= rect.height():
+            return ""
+        return f"({cursor_pos.x()}, {cursor_pos.y()})"
+
+    def resizeEvent(self, event):
+        """Rescale the child image and update statusbar on resize event."""
+        super().resizeEvent(event)
+        if self.items():
+            self.scale(self._scale)
+            api.status.update("image zoom level changed")
+            self.resized.emit()
+
+    def mouseMoveEvent(self, event):
+        """Override mouse move event to also update the status.
+
+        Needed by the cursor position related status module and only applied in case it
+        is used at all to avoid unnecessary updates.
+        """
+        api.status.update("mouse position changed")
+        super().mouseMoveEvent(event)
+
+    def _leave_event(self, event):
+        """Override leave event to also update the status.
+
+        Needed by the cursor position related status module and only applied in case it
+        is used at all to avoid unnecessary updates.
+        """
+        api.status.update("mouse position changed")
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        """Update mouse press event to start panning on left button."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """Update mouse release event to stop any panning."""
+        self.setDragMode(QGraphicsView.DragMode.NoDrag)
+        super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event):
+        """Update mouse wheel to zoom with control."""
+        require_ctrl = api.settings.image.zoom_wheel_ctrl
+        if not require_ctrl or event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            # We divide by 120 as this is the regular delta multiple
+            # See https://doc.qt.io/qt-5/qwheelevent.html#angleDelta
+            steps = event.angleDelta().y() / 120
+            scale = 1.03**steps
+            self._scale_to_float(self.zoom_level * scale)
+            self._scale = ImageScaleFloat(self.zoom_level)
+            api.status.update("image zoom level changed")
+        else:
+            super().wheelEvent(event)
+
+    def focusOutEvent(self, event):
+        """Stop slideshow when focusing another widget."""
+        if (
+            event.reason() != Qt.FocusReason.ActiveWindowFocusReason
+        ):  # Unfocused the whole window
+            slideshow.stop()
