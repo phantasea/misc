@@ -6,6 +6,8 @@ apps/cmdfu/build
 apps/cmdfu/dist
 apps/cmdfu/fu.egg-info
 
+apps/appimg/
+
 font/.uuid
 dict/stardict-21shijishuangxiangcidian-big5-2.4.2/21shijishuangxiangcidian-big5.idx.oft
 dict/stardict-21shijishuangyukejicidian-big5-2.4.2/21shijishuangyukejicidian-big5.idx.oft
