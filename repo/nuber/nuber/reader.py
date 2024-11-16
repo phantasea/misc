@@ -1,0 +1,484 @@
+import curses
+import json
+import appdirs
+import os
+import ueberzug.lib.v0 as ueberzug
+from .rust_module.nuber import Book, Image
+from .toc import Toc
+from .bookmarks import Bookmark
+from .cmdline import CmdLine
+from .config import Config
+
+
+class Reader:
+    def __init__(self, path: str, config_path=None) -> None:
+        # curses init
+        self.path = os.path.abspath(path)
+        self.stdscr: curses.window = curses.initscr()
+        self.rows, self.cols = self.stdscr.getmaxyx()
+
+        curses.noecho()
+        curses.curs_set(0)
+        curses.set_escdelay(1) # type: ignore
+        curses.start_color()
+        curses.use_default_colors()
+        curses.init_pair(1, curses.COLOR_MAGENTA, -1)
+        curses.init_pair(2, curses.COLOR_YELLOW, -1)
+
+        # read configuration file
+        if config_path == None:
+            config_path = os.path.join(appdirs.user_config_dir(), "nuber")
+        if not os.path.exists(config_path):
+            os.mkdir(config_path)
+        config_file_path = os.path.join(config_path, "config.toml")
+        if not os.path.exists(config_file_path):
+            with open(config_file_path, "x"):
+                pass
+
+        self.config = Config(config_file_path)
+
+        # override colors
+        if color := self.config.color("highlight_color"):
+            curses.init_color(curses.COLOR_MAGENTA, *color)
+        if color := self.config.color("highlight_color2"):
+            curses.init_color(curses.COLOR_YELLOW, *color)
+
+        self.cache_dir = self.config.get("cache_dir")
+        if self.cache_dir is None:
+            self.cache_dir = os.path.join(appdirs.user_cache_dir(), "nuber")
+
+        if not os.path.exists(self.cache_dir):
+            os.mkdir(self.cache_dir)
+        self.state_file = os.path.join(self.cache_dir, "state.json")
+        self.book = Book(self.path)
+        self.lines = self.book.number_of_lines()
+
+        self.query = ""
+        self.offset = 0
+        self.current_position = 0
+        self.chapter_idx = 0
+        self.positions = [0] * self.book.get_num_chapters()
+        self.placements = {}
+        self.current_chapter_placements = []
+        self.word_count_per_line = []
+        self.highlights = []
+        self.highlights_index = 0
+        self.bookmarks = Bookmark(self.stdscr, keybinds=self.config.keybinds("bookmarks_keybinds"))
+
+        if os.path.exists(self.state_file):
+            with open(self.state_file, "r") as state_file:
+                states = json.loads(state_file.read())
+                try:
+                    state = states[self.path]
+                    self.positions = state["positions"]
+                    self.chapter_idx = state["chapter_idx"]
+                    self.bookmarks.load_bookmarks(state["bookmarks"])
+                    self.current_position = self.positions[self.chapter_idx]
+                    self.book.set_current_chapter(self.chapter_idx)
+                except KeyError:
+                    pass
+
+        self.toc = Toc(self.stdscr, self.book.get_toc(), keybinds=self.config.keybinds("toc_keybinds"))
+        self.cmdline = CmdLine(self.stdscr)
+
+        # default keys
+        self.keys = {
+                ord("h"): self.action_previous_chapter,
+                ord("j"): self.action_scroll_down,
+                ord("k"): self.action_scroll_up,
+                ord("l"): self.action_next_chapter,
+                ord("q"): self.action_quit,
+                ord("G"): self.action_bottom,
+                ord("g"): self.action_top,
+                ord("t"): self.action_open_toc,
+                ord(":"): self.action_open_cmd,
+                ord("/"): self.action_open_search,
+                ord("B"): self.action_open_bookmarks,
+                ord("b"): self.action_add_bookmark,
+                ord("n"): self.action_next_search,
+                ord("N"): self.action_prev_search,
+                curses.KEY_RESIZE: self.action_resize,
+                }
+
+        # update keys from config file 
+        reader_keybinds = self.config.keybinds("reader_keybinds").items()
+        custom_keys = {k: getattr(self, f"action_{v}", self.action_noop) for k, v, in reader_keybinds}
+        self.keys.update(custom_keys)
+
+    def add_image(self, canvas: ueberzug.Canvas, position: tuple[int, int], info: Image) -> None:
+        img_id = f"{position[0]}{position[1]}{info.path}"
+        if img_id in self.placements:
+            placement = self.placements[img_id]
+        else:
+            placement = canvas.create_placement(img_id)
+            placement.path = info.path
+            self.placements[img_id] = placement
+        placement.x, placement.y = position
+        placement.width, placement.height = info.size
+        self.current_chapter_placements.append((position[1], placement))
+
+    def render_chapter(self, canvas: ueberzug.Canvas) -> None:
+        chapter = self.book.render_current_chapter()
+        self.chapter_rows = max(self.rows, len(chapter))
+        self.pad: curses.window = curses.newpad(self.chapter_rows, self.cols)
+        self.percentage_win = curses.newwin(1, 10, 0, self.cols - 4)
+        self.highlights_win: curses.window | None = None
+        # appears when searching
+        self.word_count_per_line = []
+        for line_num, elements in enumerate(chapter):
+            current_pos = 0
+            word_count = 0
+            for element in elements:
+                if info := element.image_info:
+                    if element.text.startswith("S"):
+                        self.add_image(canvas, (current_pos, line_num), info)
+                    current_pos += len(element.text)
+                else:
+                    current_pos += self.addstr(line_num, current_pos, element.text, element.style)
+                word_count += len(element.text.split())
+            self.word_count_per_line.append(max(1, word_count))
+
+    def redraw_text_formatting(self) -> None:
+        chapter = self.book.render_current_chapter()
+        for line_num, elements in enumerate(chapter):
+            current_pos = 0
+            word_count = 0
+            for element in elements:
+                if not element.image_info:
+                    current_pos += self.addstr(line_num, current_pos, element.text, element.style)
+                word_count += len(element.text.split())
+
+
+    def determine_visibility(self, y: int, h: int) -> ueberzug.Visibility:
+        y_pos = y - self.offset
+        padding = 1
+        if y_pos + h + padding < 0:
+            return ueberzug.Visibility.INVISIBLE
+        if y_pos - padding > self.rows:
+            return ueberzug.Visibility.INVISIBLE
+        return ueberzug.Visibility.VISIBLE
+
+    def addstr(self, y: int, x: int, text: str, styles: list) -> int:
+        formatting = curses.A_NORMAL
+        for style in styles:
+            if style == "bold":
+                formatting = formatting | curses.A_BOLD
+            elif style == "italic":
+                formatting = formatting | curses.A_ITALIC
+            elif style == "reverse":
+                formatting = formatting | curses.A_REVERSE
+            elif style == "underline":
+                formatting = formatting | curses.A_UNDERLINE
+
+        try:
+            self.pad.addstr(y, x, text, formatting)
+            return len(text)
+        except curses.error:
+            return 0
+
+    def update_offset(self) -> None:
+        self.offset = 0
+        while self.current_position > sum(self.word_count_per_line[:self.offset]):
+            self.offset += 1
+
+    def update_progress(self) -> None:
+        self.progress = sum(self.lines[:max(0, self.chapter_idx - 1)]) + self.offset + self.rows
+
+    def highlight_query(self) -> None:
+        self.redraw_text_formatting()
+        if not self.highlights:
+            return
+
+        formatting = curses.color_pair(1) | curses.A_BOLD
+        formatting_current = curses.color_pair(2) | curses.A_REVERSE
+
+        for highlight_idx, data in enumerate(self.highlights):
+            (row, col), other_lines = data
+            for row_offset, chars_len in enumerate(other_lines):
+                # only on the first line start from `col`
+                # every other line should be from the start
+                start_col = 0 if row_offset else col
+                f = formatting_current if highlight_idx == self.highlights_index else formatting
+                self.pad.chgat(row + row_offset, start_col, chars_len, f)
+
+    @staticmethod
+    def action_noop(_: ueberzug.Canvas) -> None:
+        pass
+
+    def action_scroll_down(self, canvas: ueberzug.Canvas, step=1) -> None:
+        for _ in range(step):
+            if self.offset < self.chapter_rows - self.rows:
+                self.offset += 1
+                self.progress += 1
+        self.current_position = sum(self.word_count_per_line[:self.offset])
+        self.redraw(canvas)
+
+    def action_scroll_up(self, canvas: ueberzug.Canvas, step=1) -> None:
+        for _ in range(step):
+            if self.offset > 0:
+                self.offset -= 1
+                self.progress -= 1
+        self.current_position = sum(self.word_count_per_line[:self.offset])
+        self.redraw(canvas)
+
+    def action_scroll_to(self, canvas: ueberzug.Canvas, target=0) -> None:
+        step = self.offset - target
+        if step < 0:
+            self.action_scroll_down(canvas, step=-step)
+        else:
+            self.action_scroll_up(canvas, step=step)
+
+    def action_jump_to_highlight(self, canvas: ueberzug.Canvas) -> None:
+        (current_row, _), _ = self.highlights[self.highlights_index]
+        row_padding = self.rows // 3
+        target = current_row - row_padding
+        self.action_scroll_to(canvas, target=target)
+
+    def action_top(self, canvas: ueberzug.Canvas) -> None:
+        self.progress -= self.offset
+        self.offset = 0
+        self.current_position = 0
+        self.redraw(canvas)
+
+    def action_bottom(self, canvas: ueberzug.Canvas) -> None:
+        # remove offset from progrss, as if calculating progress from the 1st line
+        self.progress -= self.offset
+        self.offset = self.chapter_rows - self.rows
+        # add newly calculated offset for bottom of chapter
+        self.progress += self.offset
+        self.current_position = sum(self.word_count_per_line[:self.offset])
+        self.redraw(canvas)
+
+    def action_next_chapter(self, canvas: ueberzug.Canvas) -> None:
+        if self.book.next_chapter():
+            self.highlights = []
+            self.highlights_index = 0
+            self.positions[self.chapter_idx] = self.current_position
+            self.chapter_idx += 1
+            self.clear(canvas)
+            self.current_position = self.positions[self.chapter_idx]
+            self.render_chapter(canvas)
+            self.progress -= self.offset
+            self.update_offset()
+            self.progress += self.lines[self.chapter_idx - 2] + self.offset
+            self.query = ""
+            self.hide_highlights_counter_window()
+            self.redraw(canvas)
+
+    def action_previous_chapter(self, canvas: ueberzug.Canvas) -> None:
+        if self.book.previous_chapter():
+            self.highlights = []
+            self.highlights_index = 0
+            self.positions[self.chapter_idx] = self.current_position
+            self.progress -= self.offset + self.lines[self.chapter_idx - 2]
+            self.chapter_idx -= 1
+            self.clear(canvas)
+            self.current_position = self.positions[self.chapter_idx]
+            self.render_chapter(canvas)
+            self.update_offset()
+            self.progress += self.offset
+            self.query = ""
+            self.hide_highlights_counter_window()
+            self.redraw(canvas)
+
+    def action_open_toc(self, canvas: ueberzug.Canvas) -> None:
+        self.hide_current_placements(canvas)
+        action, chapter = self.toc.run(self.chapter_idx)
+        if action == "quit":
+            self.action_quit(canvas)
+        elif action == "select":
+            self.positions[self.chapter_idx] = self.current_position
+            self.chapter_idx = chapter
+            self.clear(canvas)
+            self.current_position = 0
+            self.book.set_current_chapter(self.chapter_idx)
+            self.render_chapter(canvas)
+            self.update_offset()
+            self.update_progress()
+            self.redraw(canvas)
+        elif action == "resize":
+            self.action_resize(canvas)
+        else:
+            self.redraw(canvas)
+
+    def action_open_bookmarks(self, canvas: ueberzug.Canvas) -> None:
+        self.hide_current_placements(canvas)
+        position = self.chapter_idx, self.current_position
+        action, bookmark = self.bookmarks.run(position)
+        if action == "quit":
+            self.action_quit(canvas)
+        elif action == "select":
+            self.positions[self.chapter_idx] = self.current_position
+            self.clear(canvas)
+            self.chapter_idx, self.current_position = bookmark
+            self.book.set_current_chapter(self.chapter_idx)
+            self.render_chapter(canvas)
+            self.update_offset()
+            self.update_progress()
+            self.redraw(canvas)
+        elif action == "resize":
+            self.action_resize(canvas)
+        else:
+            self.redraw(canvas)
+
+    def action_add_bookmark(self, canvas: ueberzug.Canvas) -> None:
+        self.action_open_cmd(canvas, command="bookmark add ")
+
+    def action_open_cmd(self, canvas: ueberzug.Canvas, command="") -> None:
+        self.hide_obstructing_placements(canvas)
+        action, command = self.cmdline.run(command=command)
+        # system commands:
+        if action == "resize":
+            self.action_resize(canvas)
+            return
+
+        tokens = command.split()
+        if len(tokens) > 2 and tokens[0] == "bookmark" and tokens[1] == "add":
+            if label := " ".join(tokens[2:]):
+                position = self.chapter_idx, self.current_position
+                self.bookmarks.add_bookmark(label, position)
+        # TODO: add indication for unkown command
+        self.redraw(canvas)
+    
+    def action_open_search(self, canvas: ueberzug.Canvas) -> None:
+        self.hide_obstructing_placements(canvas)
+        # clear previous search, probably the slowest solution
+        action, self.query = self.cmdline.run(prompt="/")
+        if action == "resize":
+            self.action_resize(canvas)
+            return
+
+        if len(self.query) < 1:
+            self.redraw_text_formatting()
+            self.redraw(canvas)
+            return
+
+        self.highlights = self.book.highlight_query_in_current_chapter(self.query)
+        self.highlights_index = 0
+        if not self.highlights:
+            self.highlight_query()
+            self.redraw(canvas)
+            return
+        self.highlight_query()
+        self.action_jump_to_highlight(canvas)
+
+    def action_next_search(self, canvas: ueberzug.Canvas) -> None:
+        if not self.highlights:
+            return
+        # modulu add 1 to the index
+        self.highlights_index = (self.highlights_index + 1) % len(self.highlights)
+        self.highlight_query()
+        self.action_jump_to_highlight(canvas)
+
+    def action_prev_search(self, canvas: ueberzug.Canvas) -> None:
+        if not self.highlights:
+            return
+        # modulu add -1 to the index
+        self.highlights_index = (self.highlights_index - 1) % len(self.highlights)
+        self.highlight_query()
+        self.action_jump_to_highlight(canvas)
+
+    def action_quit(self, _) -> None:
+        self.positions[self.chapter_idx] = self.current_position
+        states = {}
+        if os.path.exists(self.state_file):
+            with open(self.state_file, "r") as state_file:
+                states = json.loads(state_file.read())
+
+        states[self.path] = {
+                "positions": self.positions,
+                "chapter_idx": self.chapter_idx,
+                "bookmarks": self.bookmarks.data,
+                }
+
+        with open(self.state_file, "w") as state_file:
+            state_file.write(json.dumps(states))
+        curses.endwin()
+        exit(0)
+
+    def action_resize(self, canvas: ueberzug.Canvas) -> None:
+        self.clear(canvas)
+        self.book.update_term_info()
+        self.rows, self.cols = self.stdscr.getmaxyx()
+        self.lines = self.book.number_of_lines()
+        self.update_progress()
+        self.render_chapter(canvas)
+        self.update_offset()
+        self.highlights = self.book.highlight_query_in_current_chapter(self.query)
+        self.highlight_query()
+        self.redraw(canvas)
+
+    def on_key(self, key: int, canvas: ueberzug.Canvas) -> None:
+        action = self.keys.get(key, self.action_noop)
+        action(canvas)
+
+    def clear(self, canvas: ueberzug.Canvas) -> None:
+        try:
+            self.pad.clear()
+            self.percentage_win.clear()
+            if self.highlights_win:
+                self.highlights_win.clear()
+            with canvas.synchronous_lazy_drawing:
+                for _, placement in self.current_chapter_placements:
+                    placement.visibility = ueberzug.Visibility.INVISIBLE
+            self.current_chapter_placements = []
+        except AttributeError:
+            pass
+
+    def hide_current_placements(self, canvas: ueberzug.Canvas) -> None:
+        with canvas.synchronous_lazy_drawing:
+            for _, placement in self.current_chapter_placements:
+                placement.visibility = ueberzug.Visibility.INVISIBLE
+
+    def hide_obstructing_placements(self, canvas: ueberzug.Canvas) -> None:
+        with canvas.lazy_drawing:
+            for _, placement in self.current_chapter_placements:
+                if placement.y + placement.height + 1 >= self.rows:
+                    placement.visibility = ueberzug.Visibility.INVISIBLE;
+
+    def hide_highlights_counter_window(self) -> None:
+        if self.highlights_win:
+            del self.highlights_win
+            self.highlights_win = None
+
+    def redraw(self, canvas: ueberzug.Canvas) -> None:
+        if self.offset > (offset := self.chapter_rows - self.rows):
+            self.offset = offset
+        self.pad.refresh(self.offset, 0, 0, 0, self.rows - 1, self.cols - 1)
+
+        if (lines_sum := sum(self.lines)) <= 0:
+          percentage_str = "100%"
+        else:
+          percentage_str = f"{self.progress * 100 // lines_sum}%"
+
+        self.percentage_win.addstr(0, 4 - len(percentage_str), percentage_str, curses.A_BOLD)
+        self.percentage_win.refresh()
+
+        if not self.query:
+            self.hide_highlights_counter_window()
+        else:
+            # calculate the human legible index
+            highlight_index = self.highlights_index + 1 if self.highlights else 0
+            highlights_str = f"{highlight_index}/{len(self.highlights)}"
+            win_y = self.rows - 1
+            win_x = self.cols - len(highlights_str)
+            self.highlights_win = curses.newwin(1, len(highlights_str) + 1, win_y, win_x)
+            self.highlights_win.addstr(0, 0, highlights_str, curses.A_BOLD | curses.A_REVERSE)
+            self.highlights_win.refresh()
+
+        with canvas.synchronous_lazy_drawing:
+            for initial_y, placement in self.current_chapter_placements:
+                visibility = self.determine_visibility(initial_y, placement.height)
+                if visibility == ueberzug.Visibility.VISIBLE:
+                    placement.y = initial_y - self.offset
+                placement.visibility = visibility
+
+    @ueberzug.Canvas()
+    def loop(self, canvas: ueberzug.Canvas) -> None:
+        self.render_chapter(canvas)
+        self.update_offset()
+        self.update_progress()
+        self.redraw(canvas)
+        while True:
+            ch = self.pad.getch()
+            self.on_key(ch, canvas)
