@@ -7,9 +7,10 @@
  */
 //static char *font = "mono:pixelsize=12:antialias=true:autohint=true";
 //static char *font2[] = { "NotoColorEmoji:pixelsize=10:antialias=true:autohint=true" };
-static char *font = "mono:pixelsize=43:antialias=true:autohint=true";
-static char *font2[] = { "NotoColorEmoji:pixelsize=25:antialias=true:autohint=true" };
-static int borderpx = 1;
+//static char *font = "mono:pixelsize=43:antialias=true:autohint=true";
+static char *font = "mono:pixelsize=40:antialias=true:autohint=true";
+static char *font2[] = { "NotoColorEmoji:pixelsize=36:antialias=true:autohint=true" };
+static int borderpx = 0;
 
 /*
  * What program is execed by st depends of these precedence rules:
