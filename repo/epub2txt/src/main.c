@@ -1,7 +1,7 @@
 /*============================================================================
   epub2txt v2 
   main.c
-  Copyright (c)2020 Kevin Boone, GPL v3.0
+  Copyright (c)2020-2024 Kevin Boone, GPL v3.0
 ============================================================================*/
 
 #include <stdio.h>
@@ -12,9 +12,20 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <getopt.h>
+#include <signal.h>
 #include "epub2txt.h" 
 #include "defs.h" 
 #include "log.h" 
+
+/*============================================================================
+  sig_handler 
+============================================================================*/
+static void sig_handler (int signo)
+  {
+  (void)signo;
+  epub2txt_cleanup();
+  exit (0);
+  }
 
 /*============================================================================
   main
@@ -30,6 +41,7 @@ int main (int argc, char **argv)
   BOOL meta = FALSE;
   BOOL notext = FALSE;
   BOOL calibre = FALSE;
+  char *section_separator = NULL;
   int width = 80;
 
   static struct option long_options[] =
@@ -42,6 +54,7 @@ int main (int argc, char **argv)
      {"noansi", no_argument, NULL, 'n'},
      {"width", required_argument, NULL, 'w'},
      {"log", required_argument, NULL, 'l'},
+     {"separator", required_argument, NULL, 's'},
      {"help", no_argument, NULL, 'h'},
      {"notext", no_argument, NULL, 0},
      {0, 0, 0, 0}
@@ -82,7 +95,7 @@ int main (int argc, char **argv)
   while (1)
     {
     int option_index = 0;
-    opt = getopt_long (argc, argv, "avw:l:nrmch",
+    opt = getopt_long (argc, argv, "avw:l:nrmchs:",
       long_options, &option_index);
 
     if (opt == -1) break;
@@ -110,6 +123,9 @@ int main (int argc, char **argv)
           meta = TRUE; 
         else if (strcmp (long_options[option_index].name, "notext") == 0)
           notext = TRUE; 
+        else if (strcmp 
+	       (long_options[option_index].name, "separator") == 0)
+          section_separator = strdup (optarg); 
         else
           exit (-1);
       case 'a':
@@ -130,13 +146,15 @@ int main (int argc, char **argv)
         meta = TRUE; break;
       case 'w':
         width = atoi (optarg); break;
+      case 's':
+        section_separator = strdup (optarg); break;
       }
     }
 
   if (show_version)
     {
     printf (APPNAME " version " VERSION "\n");
-    printf ("Copyright (c)2013-2022 Kevin Boone and contributors\n");
+    printf ("Copyright (c)2013-2024 Kevin Boone and contributors\n");
     printf ("Distributed under the terms of the GNU Public Licence, v3.0\n");
     exit (0);
     }
@@ -144,16 +162,17 @@ int main (int argc, char **argv)
   if (show_help)
     {
     printf ("Usage: %s [options] {files...}\n", argv[0]);
-    printf ("  -a,--ascii         try to output ASCII only\n");
-    printf ("  -c,--calibre       show Calibre metadata (with -m)\n");
-    printf ("  -h,--help          show this message\n");
-    printf ("  -l,--log=N         set log level, 0-4\n");
-    printf ("  -m,--meta          dump document metadata\n");
-    printf ("  -n,--noansi        don't output ANSI terminal codes\n");
-    printf ("     --notext        don't output document body\n");
-    printf ("  -r,--raw           no formatting at all\n");
-    printf ("  -v,--version       show version\n");
-    printf ("  -w,--width=N       set output width\n");
+    printf ("  -a,--ascii          try to output ASCII only\n");
+    printf ("  -c,--calibre        show Calibre metadata (with -m)\n");
+    printf ("  -h,--help           show this message\n");
+    printf ("  -l,--log=N          set log level, 0-4\n");
+    printf ("  -m,--meta           dump document metadata\n");
+    printf ("  -n,--noansi         don't output ANSI terminal codes\n");
+    printf ("     --notext         don't output document body\n");
+    printf ("  -r,--raw            no formatting at all\n");
+    printf ("  -s,--separator=text section separator text\n");
+    printf ("  -v,--version        show version\n");
+    printf ("  -w,--width=N        set output width\n");
     exit (0);
     }
 
@@ -171,6 +190,7 @@ int main (int argc, char **argv)
   options.meta = meta;
   options.notext = notext;
   options.calibre = calibre;
+  options.section_separator = section_separator;
 
   if (is_a_tty)
     options.ansi = TRUE;
@@ -178,6 +198,11 @@ int main (int argc, char **argv)
     options.ansi = FALSE; 
  
   options.raw = raw;
+
+  signal (SIGPIPE, sig_handler);
+  signal (SIGQUIT, sig_handler);
+  signal (SIGINT, sig_handler);
+  signal (SIGHUP, sig_handler);
 
   int i;
   for (i = optind; i < argc; i++)
@@ -192,6 +217,7 @@ int main (int argc, char **argv)
       }
     }
 
-    exit (0);
+  if (section_separator) free (section_separator);
+  exit (0);
   }
 

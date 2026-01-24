@@ -18,6 +18,7 @@ BOOL            wstring_create_from_utf8_file (const char *filename,
                   WString **result, char **error);
 void            wstring_destroy (WString *self);
 const int       wstring_length (const WString *self);
+const int       wstring_length_calc (const WString *self);
 const uint32_t *wstring_wstr (const WString *self);
 char           *wstring_to_utf8 (const WString *self);
 void            wstring_append_c (WString *self, const uint32_t c);

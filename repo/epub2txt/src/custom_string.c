@@ -22,7 +22,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <ctype.h>
-#include "string.h" 
+#include "custom_string.h" 
 #include "defs.h" 
 #include "log.h" 
 

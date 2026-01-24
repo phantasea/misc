@@ -1,8 +1,10 @@
-VERSION := 2.06
+VERSION := 2.11
 CC      := gcc
-CFLAGS  := -Wall -fPIC -fPIE 
-#LDFLAGS := -pie -s
-LDFLAGS := -pie 
+EXTRA_CFLAGS ?= 
+EXTRA_LDLAGS ?= 
+CFLAGS  := -Wall -Wno-unused-result -O3 $(EXTRA_CFLAGS)
+#LDFLAGS := -pie -s # Android
+LDFLAGS := -s $(EXTRA_LDFLAGS)
 DESTDIR :=
 PREFIX  := /usr
 BINDIR  := /bin
@@ -19,7 +21,7 @@ $(TARGET): $(OBJECTS)
 
 build/%.o: src/%.c
 	@mkdir -p build/
-	$(CC) $(CFLAGS) -g -DVERSION=\"$(VERSION)\" -DAPPNAME=\"$(APPNAME)\" -MD -MF $(@:.o=.deps) -c -o $@ $< 
+	$(CC) $(CFLAGS) -DVERSION=\"$(VERSION)\" -DAPPNAME=\"$(APPNAME)\" -MD -MF $(@:.o=.deps) -c -o $@ $< 
 
 clean:
 	$(RM) -r build/ $(TARGET) 

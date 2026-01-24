@@ -15,13 +15,14 @@
 #include <errno.h> 
 #include <string.h> 
 #include "wstring.h"
-#include "string.h"
+#include "custom_string.h"
 #include "convertutf.h"
 #include "log.h"
 
 struct _WString
   {
   uint32_t *str;
+  int len;
   }; 
 
 
@@ -55,6 +56,7 @@ WString *wstring_create_empty (void)
   WString *self = malloc (sizeof (WString));
   self->str = malloc (sizeof (uint32_t));
   self->str[0] = 0;
+  self->len = 0;
   return self;
   }
 
@@ -67,6 +69,7 @@ WString *wstring_create_from_utf8 (const char *s)
   {
   WString *self = malloc (sizeof (WString));
   self->str = wstring_convert_utf8_to_utf32 (s);
+  self->len = wstring_length_calc(self);
   return self;
   }
 
@@ -93,10 +96,13 @@ BOOL wstring_create_from_utf8_file (const char *filename,
     buff[n] = 0;
 
     // Might need to skip a UTF-8 BOM when reading file
-    if (buff[0] == (char)0xEF && buff[1] == (char)0xBB && buff[2] == (char)0xBF)
+    if (buff[0] == (char)0xEF && buff[1] == (char)0xBB && buff[2] == (char)0xBF) {
       self->str = wstring_convert_utf8_to_utf32 (buff + 3);
-    else
+      self->len = wstring_length_calc(self);
+    } else {
       self->str = wstring_convert_utf8_to_utf32 (buff);
+      self->len = wstring_length_calc(self);
+    }
 
     free (buff);
 
@@ -116,9 +122,9 @@ BOOL wstring_create_from_utf8_file (const char *filename,
 
 
 /*============================================================================
-  wstring_length
+  wstring_length_calc
 ============================================================================*/
-const int wstring_length (const WString *self)
+const int wstring_length_calc (const WString *self)
   {
   IN
   if (!self) 
@@ -138,6 +144,16 @@ const int wstring_length (const WString *self)
   return ret;
   OUT
   }
+
+/*============================================================================
+  wstring_length
+============================================================================*/
+inline const int wstring_length (const WString *self)
+{
+    if (!self)
+        return 0;
+    return self->len;
+}
 
 
 /*============================================================================
@@ -190,6 +206,7 @@ void wstring_append_c (WString *self, const uint32_t c)
   self->str = realloc (self->str, (l + 2) * sizeof (uint32_t));
   self->str[l] = c;
   self->str[l+1] = 0; 
+  self->len = l + 1;
   }
 
 
@@ -205,6 +222,7 @@ void wstring_append (WString *self, const WString *other)
   for (i = 0; i < otherlen; i++)
     self->str[mylen+i] = other->str[i];
   self->str[mylen+i] = 0; 
+  self->len = mylen + otherlen;
   }
 
 
@@ -216,6 +234,7 @@ void  wstring_clear (WString *self)
   free (self->str);
   self->str = malloc (sizeof (uint32_t));
   self->str[0] = 0;
+  self->len = 0;
   }
 
 
