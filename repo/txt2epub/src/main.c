@@ -1,7 +1,7 @@
 /*==========================================================================
   txt2epub
   main.c
-  Copyright *c)201 Kevin Boone, GPL3.0 
+  Copyright (c)2023-2025 Kevin Boone, GPL3.0 
 ==========================================================================*/
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <pcre.h>
+#include <time.h>
 #include <sys/stat.h>
 #include "kmsconstants.h" 
 #include "kmslogging.h" 
@@ -27,7 +28,7 @@
 /*==========================================================================
   string_to_file 
 ==========================================================================*/
-int string_to_file (const char *str, const char *file)
+static int string_to_file (const char *str, const char *file)
   {
   int ret = 0;
   int f = open (file, O_WRONLY | O_CREAT | O_TRUNC, 0755);
@@ -49,7 +50,7 @@ int string_to_file (const char *str, const char *file)
 file_get_first_line
 Read the first line in a file. Returns NULL if the file cannot be read
 ==========================================================================*/
-char *file_get_first_line (char *filename)
+static char *file_get_first_line (char *filename)
   {
   char *ret = NULL;
   FILE *f = fopen (filename, "r");
@@ -69,7 +70,7 @@ char *file_get_first_line (char *filename)
 make_chapter_list
 Use the filenames as a list of chapter names
 ==========================================================================*/
-KMSList *make_chapter_list (char **argv, int argc, int offset, 
+static KMSList *make_chapter_list (char **argv, int argc, int offset, 
     BOOL firstlines)
   {
   KMSList *ch_list = kmslist_create_strings();
@@ -125,6 +126,7 @@ int main (int argc, char **argv)
   char *book_language = NULL;
   char *cover_image = NULL;
   char *cover_basename = NULL; 
+  char *verbatim_marker = strdup ("`"); 
 
   static struct option long_options[] = 
    {
@@ -139,6 +141,7 @@ int main (int argc, char **argv)
      {"ignore-markdown", no_argument, NULL, 'm'},
      {"remove-pagenum", required_argument, NULL, 'r'},
      {"title", required_argument, NULL, 't'},
+     {"verbatim-marker", required_argument, NULL, 'm'},
      {"extra-para", no_argument, NULL, 'x'},
      {"version", no_argument, &show_version, 'v'},
      {0, 0, 0, 0}
@@ -151,7 +154,7 @@ int main (int argc, char **argv)
   while (1)
    {
    int option_index = 0;
-   opt = getopt_long (argc, argv, "vhp?o:t:a:l:imc:fxr",
+   opt = getopt_long (argc, argv, "vhp?o:t:a:l:ic:fxrm:",
      long_options, &option_index);
 
    if (opt == -1) break;
@@ -180,6 +183,8 @@ int main (int argc, char **argv)
           cover_image = strdup (optarg);
         else if (strcmp (long_options[option_index].name, "language") == 0)
           book_language = strdup (optarg);
+        else if (strcmp (long_options[option_index].name, "verbatim-marker") == 0)
+          verbatim_marker = strdup (optarg);
         else if (strcmp (long_options[option_index].name, "ignore-index") == 0)
           indent_is_para = FALSE; 
         else if (strcmp (long_options[option_index].name, "extra-para") == 0)
@@ -201,8 +206,9 @@ int main (int argc, char **argv)
      case 'l': book_language = strdup (optarg); break;
      case 'o': epub_file = strdup (optarg); break;
      case 'p': para_indent = TRUE; break;
-     case 'm': markdown = FALSE; break;
+     //case 'm': markdown = FALSE; break; // Bo longer used
      case 'r': remove_pagenum = TRUE; break;
+     case 'm': free (verbatim_marker); verbatim_marker = strdup (optarg); break;
      case 't': book_title = strdup (optarg); break;
      case 'v': show_version = TRUE; break;
      case 'x': extra_para = TRUE; break;
@@ -233,7 +239,7 @@ int main (int argc, char **argv)
   if (show_version)
     {
     printf ("txt2epub " VERSION "\n");
-    printf ("Copyright (c)2017-2023 Kevin Boone and other contributors\n");
+    printf ("Copyright (c)2017-2024 Kevin Boone and other contributors\n");
     printf ("Distributed according to the terms of the GPL, v3.0\n");
     exit (0);
     }
@@ -290,7 +296,7 @@ int main (int argc, char **argv)
 
   if (ret == 0)
     {
-    text_init_regex();
+    text_init_regex (verbatim_marker);
 
     // At this point the output filename is known, so we can use it as
     //   the book title, unless a title is specified
@@ -350,17 +356,20 @@ int main (int argc, char **argv)
         //   but the epub file does not yet exist. So we have to create it
         //   so that realpath will work. And then we have to delete it again,
         //   else zip -r will fail, because it isn't a proper zipfile. Ugh.
-        int f = open (epub_file, O_WRONLY | O_CREAT | O_TRUNC);
+        int f = open (epub_file, O_WRONLY | O_CREAT | O_TRUNC, 
+          S_IRUSR | S_IWUSR);
         if (f > 0)
           {
 	  close (f);
-	  char epub_path[1024];
+	  char epub_path[PATH_MAX];
 	  realpath (epub_file, epub_path); 
 	  unlink (epub_path);
 	  char *content;
+          long pid = (long)getpid();
+          long tim = (long)time (NULL);
 	  asprintf (&content, "%s/content.opf", working_dir);
 	  char *content_opf = epub_make_content_opf (file_count, book_title,
-            book_author, book_language, cover_basename); 
+            book_author, book_language, cover_basename, pid, tim); 
 	  ret = string_to_file (content_opf, content);
 	  if (ret == 0)
 	    { 
@@ -373,18 +382,22 @@ int main (int argc, char **argv)
               firstlines); 
 	     
 	    char *tocncx;
-	    char *tocncx_ncx = epub_make_toc_ncx (chapter_list, book_title); 
+	    char *tocncx_ncx = epub_make_toc_ncx (chapter_list, book_title, 
+               pid, tim); 
 	    asprintf (&tocncx, "%s/toc.ncx", working_dir);
 	    string_to_file (tocncx_ncx, tocncx);
 	    free (tocncx);
 	    free (tocncx_ncx);
 	     
-	    char *cover;
-	    char *cover_xhtml = epub_make_cover (cover_basename); 
-	    asprintf (&cover, "%s/cover.html", working_dir);
-	    string_to_file (cover_xhtml, cover);
-	    free (cover);
-	    free (cover_xhtml);
+            if (cover_image)
+              {
+	      char *cover;
+	      char *cover_xhtml = epub_make_cover (cover_basename); 
+	      asprintf (&cover, "%s/cover.html", working_dir);
+	      string_to_file (cover_xhtml, cover);
+	      free (cover);
+	      free (cover_xhtml);
+              }
 
 	    int i;
 	    for (i = 0; i < file_count; i++)
@@ -392,7 +405,7 @@ int main (int argc, char **argv)
 	      char *file;
               char *title = kmslist_get (chapter_list, i);
 	      asprintf (&file, "%s/file%d.html", working_dir, i);
-	      char *file_html = text_file_to_xhtml (argv [optind+i], title,
+	      char *file_html = input_file_to_xhtml (argv [optind+i], title,
                 indent_is_para, markdown, firstlines, extra_para, 
                 remove_pagenum, para_indent);
 	      if (string_to_file (file_html, file))
@@ -405,6 +418,20 @@ int main (int argc, char **argv)
 	      }
 
 	    kmslog_debug ("Creating zipfile %s", epub_path);
+
+            // Sigh. To satisfy fussy checkers, the mimetype files must be first in the archive, and uncompressed
+
+	    asprintf (&cmd, "cd \"%s\"; zip -q -X -0 \"%s\" mimetype", 
+              working_dir, epub_path);
+	    system (cmd);
+	    free (cmd);
+
+            // So now we delete mimetype, and store everything else with default compression
+
+	    asprintf (&cmd, "cd \"%s\"; rm mimetype", 
+              working_dir);
+	    system (cmd);
+	    free (cmd);
 
 	    asprintf (&cmd, "cd \"%s\"; zip -q -r \"%s\" .", 
               working_dir, epub_path);
@@ -450,6 +477,7 @@ int main (int argc, char **argv)
   if (book_title) free (book_title);
   if (book_author) free (book_author);
   if (book_language) free (book_language);
+  if (verbatim_marker) free (verbatim_marker);
   // I don't understand why I don't need to free at least one of the
   //  following, but valgrind says not
   //if (cover_image) free (cover_image);

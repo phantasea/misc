@@ -1,37 +1,43 @@
 # txt2epub
 
-Version 0.0.3, May 2023
+Version 0.0.8, August 2025 
+
+**Note: Potential breaking change**
+
+I've had to make substantial changes to the way txt2epub processes markdown,
+because epubcheck has gotten stricter in the way it checks how XHTML tags are
+embedded within one another. It's possible that these changes will affect plain
+text as well.  My own test documents continue to format correctly, but please
+let me know (via GitHub bugs) if this latest version doesn't work for you. 
 
 ## What is this?
 
-`txt2epub` is a command-line utility for Linux,
-for converting one
-or more plain text files into an EPUB document. It will insert the
-standard author/title meta-data, generate a table of contents,
-and can include a cover image.
-Limited formatting is possible using Markdown-style text markup,
-or full XHTML if required. 
-<p/>
-This utility is intended as a relatively quick way to convert books provided
-as plain text into a format that can be handled more easily by 
-e-readers. Although most portable reading devices and software
-can handle plain text perfectly well, the
-lack of meta-data or a cover image makes collections of
-such documents unwieldy.
+`txt2epub` is a command-line utility for Linux, for converting one or more
+plain (ASCII or UTF-8) text files into an EPUB document. It will insert the standard
+author/title meta-data, generate a table of contents, and can include a cover
+image.  Limited formatting is possible using Markdown-style text markup, or
+full XHTML if required. 
 
-Although it is not its main function,  
-`txt2epub` can be used with just a plain text editor
-to produce a commercial-quality EPUB novel, 
-that will pass most publishers' validation checks. However, 
-books that have complex formatting, or embedded images, 
-need a more sophisticated approach. 
+This utility is intended as a relatively quick way to convert books provided as
+plain text into a format that can be handled more easily by e-readers. Although
+most portable reading devices and software can handle plain text perfectly
+well, the lack of meta-data or a cover image makes collections of such
+documents unwieldy.
 
-One of the design goals of `txt2epub` is to produce "clean"
-documents, free of software-specific stylesheets and formatting.  The EPUBs it
-creates will not specify fonts, absolute text sizes, colours, margins, or
-layout. The way the text is
-rendered is thus completely under the control of the reader. Its output should
-thus be acceptably readable on screens of different sizes. 
+Although not its main function,  `txt2epub` can be used with just a plain text
+editor to produce a commercial-quality EPUB novel, that will pass most
+publishers' validation checks. I've published two novels this way.  However,
+books that have complex formatting, or embedded images, need a more
+sophisticated approach. Please note that, while I check that the output of
+`txt2epub` passes `epubcheck` when provided with text and markdown input, it
+remains possible for it to output a badly-formatted EPUB if you supply XHTML as
+input, either as a complete file, or embedded in a text file. 
+
+One of the design goals of `txt2epub` is to produce "clean" documents, free of
+software-specific stylesheets and formatting.  The EPUBs it creates will not
+specify fonts, absolute text sizes, colours, margins, or layout. The way the
+text is rendered is thus completely under the control of the reader. Its output
+should thus be acceptably readable on screens of different sizes. 
 
 
 ## Example usage
@@ -41,24 +47,19 @@ thus be acceptably readable on screens of different sizes.
       --cover-image ge.jpg\
       chapter01.txt chapter02.txt chapter03.txt\ ...
 
-Convert files `chapter01.txt`, etc., into an 
-EPUB document, setting the 
-author and title meta-data appropriately. Each file will receive an
-entry in the table of contents. The image `ge.jpg` will
-form the book cover. 
-
+Convert files `chapter01.txt`, etc., into an EPUB document, setting the author
+and title meta-data appropriately. Each file will receive an entry in the table
+of contents. The image `ge.jpg` will form the book cover. 
 
 ## Prerequisites
 
-The only external dependencies are on the standard 
-linux `zip`
-utility, and the PCRE regular expression parsing library. Both
-should be available in the repositories of most Linux distributions. 
-For RHEL/Fedora: `yum install zip pcre-devel`.
+The only external dependencies are on the standard linux `zip` utility, and the
+PCRE regular expression parsing library. Both should be available in the
+repositories of most Linux distributions.  For RHEL/Fedora: `yum install zip
+pcre-devel`; for Debian/Ubuntu: `apt install libprce3-dev`.
 
-`txt2epub` will probably build and run on other
-Linux-like systems, but this has not been tested. 
-
+`txt2epub` will probably build and run on other Linux-like systems, but this
+has not been tested. 
 
 ## Building and installing
 
@@ -87,55 +88,62 @@ A line that ends in two spaces (which may not be visible at all in a text
 editor) is terminated with a line-break. This is a simple way to
 include pre-formatted text.
 
-These markdown constructions are turned into basic (X)HTML 
+These markdown constructions are turned into basic XHTML 
 tags (not style classes).
 
-Note that Markdown-style markup cannot span lines. A very long italic
-passage, for example, must be rendered as a single line, or the
-italic marker repeated on subsequent lines. 
-`txt2epub` does not support Markdown list constructs, but 
-these could be created using (X)HTML tags, if desired.
+Note that Markdown-style markup cannot span lines. A very long italic passage,
+for example, must be rendered as a single line, or the italic marker repeated
+on subsequent lines.  `txt2epub` does not support Markdown list or table
+constructs: more sophisticated formatting like this will need input supplied as
+proper XHTML. 
 
 ### XHTML support
 
-Any text files supplied to 
-`txt2epub` are just inserted into the body of an XHTML 
-document, as this is the presentation format that EPUB specifies.
-It follows that files can contain XHTML markup if necessary.
-XHTML is a stricter standard than HTML, and many ordinary HTML files will not
-pass muster -- a typical problem is not closing tags, or using
-the wrong letter case in tags.
+As of version 0.0.6, `txt2epub` distinguishes between input files
+that are already formatted as XHTNL, and everything else, which
+it assumes to be plain UTF-8/ASCII text. Any input file whose name ends in
+`.xhtml` is taken to be an XHTML file. Such a files is not
+processed in any way -- it's contents are simply inserted into
+the body of an XHTML document with the appropriate headers and
+footers for EPUB. Note that, if you want to supply files this
+way, you should supply only the _body_: all the headers and
+metadata are generated by the program.
 
-Providing XHTML can be useful for heavily formatted pages such as a
-title page or dedication. However, the files provided should
-_not_ be full XHTML files --   
-`txt2epub` will write the proper XHTML header and footer.
-Instead, just provide the body text.
+What about using particular (X)HTML tags, in a file that is otherwise
+plain text? The problem here is that `txt2epub` has no way to know
+whether XHTML special characters like '<' are to be escaped, that is,
+made into valid XHTML, or whether they indicate that the author uses
+some XHTML mixed in with the test.
 
-Many commercial e-readers use existing HTML rendering software to 
-display text; in such cases you might get away with using ordinary
-HTML. However, it isn't strictly correct, and won't pass a
-publisher's validation checks.
+The way that `txt2epub` handles this situation is as follows.
+
+Any special character that is not enclosed between 'verbatim markers' is
+escaped, and turned into valid XHTML. So the ampersand character &, for
+example, is turned into `&amp;`. Any text between verbatim markers is passed
+directly to the output file. The default verbatim marker is a back-tick.
  
+If you actually use the back-tick character in text, you must use the
+`--verbatim-marker` argument to change the marker. This can be set to any text
+that isn't used in the document. 
+
+The verbatim marker can be a multi-byte character if required.
+
 ### Table of contents
 
-`txt2epub` does not write a contents page in the document.
-However, it does write an NCX table of contents, which most e-readers
-will be able to display at any point whilst reading a book. 
-This form of table of contents also enables the next-chapter/previous-chapter
-controls on readers that have them.
+`txt2epub` does not write a contents page in the document.  However, it does
+write an NCX table of contents, which most e-readers will be able to display at
+any point whilst reading a book.  This form of table of contents also enables
+the next-chapter/previous-chapter controls on readers that have them.
 
-By default, the
-entries in the table of contents will be taken from
-the input filename, after removing any extension. So a nicely-formatted
-table of contents will require that the filenames are as a reader
-should see them, with capital letters where appropriate and spaces
-between words. 
-<p/>
-An alternative approach to generating a table of contents is
-to ensure that the first line of each file is a chapter heading,
-and use the `--first-lines` switch. This will also format
-the first line as a heading (specifically, it will embed it in an H1 tag).
+By default, the entries in the table of contents will be taken from the input
+filename, after removing any extension. So a nicely-formatted table of contents
+will require that the filenames are as a reader should see them, with capital
+letters where appropriate and spaces between words. 
+
+An alternative approach to generating a table of contents is to ensure that the
+first line of each file is a chapter heading, and use the `--first-lines`
+switch. This will also format the first line as a heading (specifically, it
+will embed it in an H1 tag).
 
 ### Input text formatting issues
 
@@ -144,21 +152,20 @@ E-book text files tend to be formatted in one of four ways:
 * One very long line per paragraph, with a blank line between each paragraph
 * One very long line per paragraph, with no blank lines between paragraphs
 * Variable-length lines with blank lines to indicate paragraph breaks
-* Variable-length lines with no blanks; paragraph breaks are indicated by white-space intended lines
+* Variable-length lines with no blanks; paragraph breaks are indicated by 
+  white-space intended lines
 
-No special effort is required to handle the first type. The second
-type will be formatted by most readers as a solid block of uninterrupted
-text, which is not pleasant to read. The `--extra-para` 
-switch might help here, by inserting a paragraph break after each 
-input line. 
+No special effort is required to handle the first type. The second type will be
+formatted by most readers as a solid block of uninterrupted text, which is not
+pleasant to read. The `--extra-para` switch might help here, by inserting a
+paragraph break after each input line. 
 
 Files of the third type present no problem.
 
-`txt2epub` attempts to handle the fourth type by treating any
-line that starts with three or more whitespace characters as a paragraph
-break. Because some files that are formatted as variable-length lines
-end up with spaces at the start of each line, this behaviour can be
-turned off using `--ignore-indent`.
+`txt2epub` attempts to handle the fourth type by treating any line that starts
+with three or more whitespace characters as a paragraph break. Because some
+files that are formatted as variable-length lines end up with spaces at the
+start of each line, this behaviour can be turned off using `--ignore-indent`.
 
 ### stdin
 
@@ -176,7 +183,7 @@ suggest that a cover image should be 590 pixels wide by 750 high. No
 check is made that the image meets this guideline -- it is simply
 copied into the EPUB. An error message will be shown if the image file
 does not exist, but the EPUB will still be created.
-<p/>
+
 The EPUB specification states that images files must be in JPEG, GIF,
 SVG, or PNG formats. No checks are made that this rule is being followed --
 `txt2epub` will install images of any type but, as with
@@ -187,107 +194,112 @@ display them.
 
 ### Splitting long documents
 
-`txt2epub` has no built-in support for splitting long
-text files into sections or chapters. There are many ways in which
-this might be done, and Linux already has useful utilities for doing it.
+`txt2epub` has no built-in support for splitting long text files into sections
+or chapters. There are many ways in which this might be done, and Linux already
+has useful utilities for doing it.
 
-Consider, for example, a long file called `fred.txt`, that
-is divided into sections headed by "Chapter 1", "Chapter 2", etc.
-This can be split into chapters like this:
+Consider, for example, a long file called `fred.txt`, that is divided into
+sections headed by "Chapter 1", "Chapter 2", etc.  This can be split into
+chapters like this:
 
     csplit -f chapter_ -b %02d.txt fred.txt /Chapter.*/ {*}
 
-This command will create the files `chapter\_00.txt`,
-`chapter\_01.txt`, etc. These chapters can then be 
-assembled into an EPUB like this:
+This command will create the files `chapter\_00.txt`, `chapter\_01.txt`, etc.
+These chapters can then be assembled into an EPUB like this:
 
     txt2epub -a "Fred Blogs" -t "My Life as a Dog" -f -o blogs.epub\ chapter*.txt
 
 (being careful about the use of the filename wildcard, as discussed
 above.)
 
-The `-f` switch instructs `txt2epub` to use the
-first line of each file as a chapter heading, both in formatting and
-in the table of contents. This works here because the use of `csplit`
- ensures
-that every file (with the possible exception of the first) begins
-with the specified pattern. 
+The `-f` switch instructs `txt2epub` to use the first line of each file as a
+chapter heading, both in formatting and in the table of contents. This works
+here because the use of `csplit` ensures that every file (with the possible
+exception of the first) begins with the specified pattern. 
 
 ### Character encoding
 
-EPUB text is required to be formatted as UTF-8. Plain ASCII works fine,
-as it is a subset of UTF-8. 8-bit extended ASCII variants will display
-with varying degrees of ugliness, depending on how many extended
-characters are used. A typical symptom of encoding mismatches of this
-sort is to see double-quotes rendered as upside-down question marks, or
-similar punctuation errors.
+EPUB text is required to be formatted as UTF-8. Plain ASCII works fine, as it
+is a subset of UTF-8. 8-bit extended ASCII variants will display with varying
+degrees of ugliness, depending on how many extended characters are used. A
+typical symptom of encoding mismatches of this sort is to see double-quotes
+rendered as upside-down question marks, or similar punctuation errors.
 
-`txt2epub` assumes that all text input is in UTF-8 or ASCII format.
-If this assumption causes problems, the `iconv` utility
-may be used to pre-process the text and fix the encoding. Unfortunately,
-if you receive a text document that has been converted from
-Microsoft Word or some other proprietary word processor, it can often
-be quite difficult to guess what the character encoding is. Consequently,
-some trial-and-error may be needed.
+In short, `txt2epub` assumes that all text input is in UTF-8 or 7-bit ASCII
+format. It makes no claims that it can handle extended ASCII characters, and an
+EPUB viewer will probably not handle them will, either.  `txt2epub` will not
+attempt to convert any character encoding.
+
+If this assumption causes problems, the `iconv` utility may be used to
+pre-process the text and fix the encoding. Unfortunately, if you receive a text
+document that has been converted from Microsoft Word or some other proprietary
+word processor, it can often be quite difficult to guess what the character
+encoding is. Consequently, some trial-and-error may be needed.
 
 
 ### Converting PDF, etc
 
-`txt2epub` can not decode PDF documents, but reasonable results
-may sometimes be obtained by using it to process the output of
-`pdftotext -layout -nopgbrk`. The `-layout` switch tells 
-`pdftotext` to
-attempt to preserve page layout; this is usually impossible, but it does
-mean that you will usually get blank lines between paragraphs. These
-are needed for `txt2epub` to identify paragraph breaks.
-The `-nopgbrk` switch prevents page break (ctrl-L) characters
-being written into the text. These don't usually cause problems in
-EPUB viewers -- in fact, they are usually ignored. But, strictly speaking,
-they are illegal in UTF-8 XML. 
+`txt2epub` can not decode PDF documents, but reasonable results may sometimes
+be obtained by using it to process the output of `pdftotext -layout -nopgbrk`.
+The `-layout` switch tells `pdftotext` to attempt to preserve page layout; this
+is usually impossible, but it does mean that you will usually get blank lines
+between paragraphs. These are needed for `txt2epub` to identify paragraph
+breaks.  The `-nopgbrk` switch prevents page break (ctrl-L) characters being
+written into the text. These don't usually cause problems in EPUB viewers -- in
+fact, they are usually ignored. But, strictly speaking, they are illegal in
+UTF-8 XML. 
 
-Documents converted from print sources often have page numbers and
-other unhelpful text embedded in the document body. Most of this is
-difficult to remove, but 
-`txt2epub` will attempt to remove page numbers, if the
-`--remove-pagenum` switch is specified. A page number is
-taken to be any line that consists of white space, followed by
-digits. Unfortunately, while (for example) a single line containing 
-"23" will be removed, "Page 23" won't. Documents with this kind
-of detritus may need more sophisticated pre-processing.
+Documents converted from print sources often have page numbers and other
+unhelpful text embedded in the document body. Most of this is difficult to
+remove, but `txt2epub` will attempt to remove page numbers, if the
+`--remove-pagenum` switch is specified. A page number is taken to be any line
+that consists of white space, followed by digits. Unfortunately, while (for
+example) a single line containing "23" will be removed, "Page 23" won't.
+Documents with this kind of detritus may need more sophisticated
+pre-processing.
 
 ### Changing paragraph output format
 
-By default `txt2epub` writes plain paragraph tags to delineate paragraphs
-in the output. Ebook readers usually render this formatting with a 
-blank line between paragraphs. Using the `--para-indent` switch will
-make the utility output a `<style>` header to set the paragraph 
-separation to a plain left indent, which can be help when reading on a 
-small screen. In general `txt2epub` does not try to control formatting,
-in the hope that viewer software will be sufficiently flexible as to
-allow the user to choose preferences. This -- paragraph separation --
-is an area when viewer software tends to fall short.
+By default `txt2epub` writes plain paragraph tags to delineate paragraphs in
+the output. Ebook readers usually render this formatting with a blank line
+between paragraphs. Using the `--para-indent` switch will make the utility
+output a `<style>` header to set the paragraph separation to a plain left
+indent, which can be help when reading on a small screen. In general `txt2epub`
+does not try to control formatting, in the hope that viewer software will be
+sufficiently flexible as to allow the user to choose preferences. This --
+paragraph separation -- is an area when viewer software tends to fall short.
 
 ## Bugs and limitations
 
-`txt2epub` presently does not remove unnecessary byte-order
-markers and similar encoding detritus from text files. 
+This is a simple program, for simple applications. It is intended to be fast,
+and to use only limited resources. I originally wrote it for embedded
+applications. It is therefore rather unsophisticated, and offers little
+opportunity for customizing the text processing operations. `pandoc` and
+`Calibre`, among others, are better for complicated conversions.
+
+`txt2epub` presently does not remove unnecessary byte-order markers and similar
+encoding detritus from text files. 
+
+Input must be encodeded as UTF-8 or 7-bit ASCII. No conversions are made.
 
 Users should be wary of using constructions like "book\*.txt" to include
 lists of files. While Linux shells usually present files in alphanumeric order,
 subtleties like locale and collation settings can modify this. It may be 
 safer to list the files explicitly.
 
-Files created by this utility will not necessarily pass the validation
-in  
-`epubcheck`
-because the "mimetype" file is not always the first in the archive. This
-can be fixed if it causes problems with readers; so far none have been
-reported.
+Files created by this utility should (since version 0.0.5) pass the validation
+in `epubcheck` that the `mimetype` file is the first in the archive, and is
+uncompressed. It should now also pass checks that the UUIDs in the OPF and NCX
+contents are value and match.
 
-`txt2epub` does not write a "guide" section in the 
-NCX table-of-contents. This is optional and, so far as I know, no EPUB
-reader takes much notice of it. 
+`txt2epub` does not write a "guide" section in the NCX table-of-contents. This
+is optional and, so far as I know, no EPUB reader takes much notice of it. 
 
+Where the EPUB specification calls for a globally-unique ID, txt2epub makes one
+from the time and process ID. This is, of course, not guaranteed to be globally
+unique. If you convert a large number of documents in a batch, these UUID tags
+will all end up the same, at least if the conversions happen within one second.
+So far as I know, no EPUB reader is bothered by this. 
 
 ## More information
 
@@ -303,12 +315,44 @@ authors are acknowledged, and you accept the risks involved in its use.
 
 ## Revisions
 
+0.0.8, August 2025
+
+- Changed the way that title and paragraph tags are nested, to comply with the
+  stricter checks in `epubcheck`.
+
+0.0.7, October 2024
+
+- Added 'verbatim' support, for embedding XHTML in plain text without breaking
+  verification
+- The source and documentation have had a bit of a tidy up, but the source is
+  still ugly and inefficient
+- Added `make tests` to process the test documents into EPUBs
+
+0.0.6, October 2024
+
+- Fixed handling of HTML entities like ampersand in the text input
+
+0.0.5, October 2024
+
+- Changed the way the mimetype file is stored, to suit fussy checkers
+- Fixed broken manpage
+- Fixed the "NCX id doesn't match OPF id" message from fussy checkers 
+- Fixed the "Missing play order in nav point element" message from
+  Okular
+
+0.0.4, June 2024
+
+- Tidied up Makefile to work better with Gentoo. 
+- Fixed an error where later versions of gcc enforce 3-argument open() 
+  in certain usages 
+
 0.0.3, May 2023
 
-Fixed a nasty bug where space indents were being processed in the first
-line of a file, causing the header to be split between paras
+- Fixed a nasty bug where space indents were being processed in the first
+  line of a file, causing the header to be split between paras
 
 0.0.2, May 2023
 
-Added `--para-indent` feature (contributed by KenH2000)
+- Added `--para-indent` feature (contributed by KenH2000)
+
 
