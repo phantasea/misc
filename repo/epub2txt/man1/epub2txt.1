@@ -1,9 +1,9 @@
-.\" Copyright (C) 2013-24 Kevin Boone 
+.\" Copyright (C) 2013-22 Kevin Boone 
 .\" Permission is granted to any individual or institution to use, copy, or
 .\" redistribute this software so long as all of the original files are
 .\" included, and that this copyright notice is retained.
 .\"
-.TH epub2txt 1 "September 2024"
+.TH epub2txt 1 "May 2022"
 .SH NAME
 epub2txt \- Extract text from EPUB documents 
 .SH SYNOPSIS
@@ -62,12 +62,6 @@ unlimited width (\fI-w\ 0\fR) in that whitespace is not trimmed,
 successive empty lines are not collapsed, and \fI--noansi\fR 
 is implied. This is the fastest way to extract text, and is appropriate
 when feeding output to an external formatter such as \fIgroff\fR.
-.LP
-.TP
-.BI -s,\-\-separator=text
-Write the specified text to stdout before decoding each spine item.
-This option is intended to help users who want to split the output
-of \fIepub2txt\fR into chapters using scripts.
 .LP
 .TP
 .BI -w,\-\-width {columns}
