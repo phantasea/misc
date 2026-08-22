@@ -7,7 +7,7 @@
  */
 //static char *font = "mono:pixelsize=12:antialias=true:autohint=true";
 //static char *font2[] = { "NotoColorEmoji:pixelsize=10:antialias=true:autohint=true" };
-//static char *font = "mono:pixelsize=43:antialias=true:autohint=true";
+//static int borderpx = 2;
 static char *font = "mono:pixelsize=40:antialias=true:autohint=true";
 static char *font2[] = { "NotoColorEmoji:pixelsize=36:antialias=true:autohint=true" };
 static int borderpx = 0;
@@ -359,6 +359,7 @@ static uint ignoremod = Mod2Mask|XK_SWITCH_MOD;
  */
 static Key key[] = {
 	/* keysym           mask            string      appkey appcursor */
+	{ XK_i,             ControlMask,    "\033[105;5u",   0,    0},
 	{ XK_KP_Home,       ShiftMask,      "\033[2J",       0,   -1},
 	{ XK_KP_Home,       ShiftMask,      "\033[1;2H",     0,   +1},
 	{ XK_KP_Home,       XK_ANY_MOD,     "\033[H",        0,   -1},
